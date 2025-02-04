@@ -129,14 +129,17 @@ def abrir_ventana_cuentas():
     ventana_cuentas.geometry("600x400")
 
     # Crear el Treeview
-    tree = ttk.Treeview(ventana_cuentas, columns=("Titular", "Entidad"), show="headings")
+    tree = ttk.Treeview(ventana_cuentas, columns=("ID","Titular", "Entidad"), show="headings")
+    tree.heading("ID", text="ID")
     tree.heading("Titular", text="Titular")
     tree.heading("Entidad", text="Entidad")
     tree.pack(fill=tk.BOTH, expand=True)
     # Configurar el encabezado de las columnas para centrarlas
+    tree.heading("ID", text="ID", anchor="center")
     tree.heading("Titular", text="Titular", anchor="center")
     tree.heading("Entidad", text="Entidad", anchor="center")
     # Configurar las celdas de los datos para centrarlas
+    tree.column("ID", anchor="center")
     tree.column("Titular", anchor="center")
     tree.column("Entidad", anchor="center")
 
@@ -183,6 +186,8 @@ def abrir_ventana_cuentas():
             conn.close()
 
             messagebox.showinfo("Éxito", "Cuenta creada exitosamente")
+            
+            
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo crear la cuenta en la base de datos: {e}")
 
@@ -201,10 +206,11 @@ def abrir_ventana_cuentas():
         
         # Obtener el ID del registro seleccionado
         item_values = tree.item(selected_item)["values"]
-        id_cuenta = item_values[0]  # El primer valor es el ID
+        id_cuenta = item_values[0]# El primer valor es el ID
+        titular_c = item_values[1]
 
         # Confirmar la eliminación
-        confirmacion = messagebox.askyesno("Confirmar eliminación", f"¿Estás seguro de eliminar el registro con ID: {id_cuenta}?")
+        confirmacion = messagebox.askyesno("Confirmar eliminación", f"¿Estás seguro de eliminar el registro con ID: {id_cuenta} {titular_c}?")
 
         if confirmacion:
             try:
@@ -226,7 +232,6 @@ def abrir_ventana_cuentas():
             except Exception as e:
                 messagebox.showerror("Error", f"No se pudo eliminar el registro: {e}")
 
-
     btn_eliminar = tk.Button(ventana_cuentas, text="Eliminar", command=eliminar_cuenta)
     btn_eliminar.pack(side=tk.LEFT, padx=10, pady=10)
 
@@ -236,7 +241,7 @@ def abrir_ventana_cuentas():
         cursor = conn.cursor()
 
         # Obtener todos los registros de la tabla Cuentas
-        cursor.execute("SELECT Titular, Entidad FROM Cuentas")
+        cursor.execute("SELECT ID, Titular, Entidad FROM Cuentas")
         rows = cursor.fetchall()
 
         # Insertar los registros en el Treeview
@@ -250,6 +255,29 @@ def abrir_ventana_cuentas():
         messagebox.showerror("Error", f"No se pudo cargar los datos de la tabla 'Cuentas': {e}")
 
 
+
+
+def cargar_nequi_opciones():
+    try:
+        # Conectar a la base de datos
+        conn = sqlite3.connect('diccionarios/base_dat.db')
+        cursor = conn.cursor()
+
+        # Obtener las columnas 'Entidad' y 'Titular' de la tabla 'Cuentas'
+        cursor.execute("SELECT Entidad, Titular FROM Cuentas")
+        rows = cursor.fetchall()
+
+        # Crear la lista con la concatenación 'Entidad - Titular'
+        nequi_opciones = [f"{row[0]} {row[1]}" for row in rows]
+
+        # Cerrar la conexión
+        conn.close()
+
+        return nequi_opciones
+
+    except Exception as e:
+        print(f"Error al cargar los datos: {e}")
+        return []
         
     
     

@@ -8,10 +8,8 @@ import pandas as pd
 import tkinter.font as tkFont
 from logica import *  # Importar todas las funciones de logica.py
 
-# Cargar el archivo JSON
-with open('diccionarios/nequis.json', 'r') as file:
-    nequi_dict = json.load(file)
-nequi_opciones = list(nequi_dict.keys())
+# Función para cargar las opciones de cuentas disponibles en la DB
+nequi_opciones = cargar_nequi_opciones()
 
 # Crear ventana principal
 ventana = tk.Tk()
@@ -82,7 +80,7 @@ combo_tipo = ttk.Combobox(frame_formulario, values=tipos_opciones, state="readon
 combo_tipo.grid(row=2, column=4, padx=5, pady=5, sticky="w")
 
 # Combobox cargando las opciones de nequis.json
-tk.Label(frame_formulario, text="Nequi:").grid(row=3, column=3, padx=5, pady=5, sticky="e")
+tk.Label(frame_formulario, text="Cuenta:").grid(row=3, column=3, padx=5, pady=5, sticky="e")
 combo_nequi = ttk.Combobox(frame_formulario, values=nequi_opciones, state="disabled", width=ancho_widget)
 combo_nequi.grid(row=3, column=4, padx=5, pady=5, sticky="w")
 
