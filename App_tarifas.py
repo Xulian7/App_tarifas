@@ -8,13 +8,10 @@ import pandas as pd
 import tkinter.font as tkFont
 from logica import *  # Importar todas las funciones de logica.py
 
-df_global = None  # Inicialmente vacío
 # Cargar el archivo JSON
 with open('diccionarios/nequis.json', 'r') as file:
     nequi_dict = json.load(file)
 nequi_opciones = list(nequi_dict.keys())
-
-archivo_excel = "diccionarios/registros_motos.xlsx"
 
 # Crear ventana principal
 ventana = tk.Tk()
@@ -112,11 +109,17 @@ btn_agregar = tk.Button(frame_botones, text="Registrar", width=ancho_widget)
 btn_agregar.grid(row=0, column=0, padx=5, pady=10, sticky="ew")
 
 
-btn_consultar = tk.Button(frame_botones, text="Consultar", width=ancho_widget, command=lambda: cargar_excel(archivo_excel, tree, entry_cedula, entry_nombre, entry_placa, entry_referencia, entry_fecha, combo_tipo, combo_nequi, combo_verificada))
+btn_consultar = tk.Button(frame_botones, text="Consultar", width=ancho_widget, command=lambda: cargar_db(tree, entry_cedula, entry_nombre, entry_placa, entry_referencia, entry_fecha, combo_tipo, combo_nequi, combo_verificada))
 btn_consultar.grid(row=0, column=1, padx=5, pady=10, sticky="ew")
 
 btn_limpiar = tk.Button(frame_botones, text="Limpiar", bg="red", fg="white", width=ancho_widget, command=lambda: limpiar_formulario(entry_cedula, entry_nombre, entry_placa, entry_monto, entry_referencia, entry_fecha, combo_tipo, combo_nequi, combo_verificada, tree))
 btn_limpiar.grid(row=0, column=2, padx=5, pady=10, sticky="ew")
+
+btn_cuentas = tk.Button(frame_botones, text="Cuentas", bg="green", fg="white", width=ancho_widget, command=abrir_ventana_cuentas)
+btn_cuentas.grid(row=0, column=3, padx=5, pady=10, sticky="ew")
+
+
+
 
 # Reservar espacio para la sección vacía
 frame_vacio = tk.Frame(frame_superior, height=20)
