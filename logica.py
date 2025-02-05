@@ -1,12 +1,11 @@
-import pandas as pd
 import tkinter as tk
 import tkinter.font as tkFont
 from tkinter import messagebox
 from tkinter import ttk
 import sqlite3
-
-
-
+import os
+from datetime import datetime
+import pandas as pd
 
 def cargar_db(tree, entry_cedula, entry_nombre, entry_placa, entry_referencia, entry_fecha, combo_tipo, combo_nequi, combo_verificada):
     try:
@@ -94,7 +93,6 @@ def cargar_db(tree, entry_cedula, entry_nombre, entry_placa, entry_referencia, e
     except Exception as e:
         messagebox.showerror("Error", f"No se pudo cargar los datos desde la base de datos: {e}")
 
-        
 def limpiar_formulario(entry_cedula, entry_nombre, entry_placa, entry_monto, entry_referencia, entry_fecha,
 combo_tipo, combo_nequi, combo_verificada, tree):
     # Limpiar campos de texto (Entry)
@@ -116,17 +114,13 @@ combo_tipo, combo_nequi, combo_verificada, tree):
         tree.delete(row)
         
     # Colocar el enfoque en entry_cedula
-    
-
-import tkinter as tk
-from tkinter import ttk, messagebox
-import sqlite3
 
 def abrir_ventana_cuentas():
     # Crear una nueva ventana para la gestión de Cuentas
     ventana_cuentas = tk.Toplevel()
     ventana_cuentas.title("Gestión de Cuentas")
     ventana_cuentas.geometry("600x400")
+    icono_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'img', 'inicio.ico')
 
     # Crear el Treeview
     tree = ttk.Treeview(ventana_cuentas, columns=("ID","Titular", "Entidad"), show="headings")
@@ -180,7 +174,7 @@ def abrir_ventana_cuentas():
             cursor = conn.cursor()
             
             # Insertar en la base de datos (no es necesario el campo ID ya que es autoincrementable)
-            cursor.execute("INSERT INTO Cuentas (Titular, Entidad) VALUES (?, ?)", 
+            cursor.execute("INSERT INTO cuentas (Titular, Entidad) VALUES (?, ?)", 
                         (titular_valor, entidad_valor))
             conn.commit()  # Confirmar la inserción
             conn.close()
@@ -218,7 +212,7 @@ def abrir_ventana_cuentas():
                 cursor = conn.cursor()
 
                 # Eliminar el registro de la base de datos
-                cursor.execute("DELETE FROM Cuentas WHERE ID = ?", (id_cuenta,))
+                cursor.execute("DELETE FROM cuentas WHERE ID = ?", (id_cuenta,))
                 conn.commit()
 
                 # Cerrar la conexión
@@ -235,24 +229,148 @@ def abrir_ventana_cuentas():
     btn_eliminar = tk.Button(ventana_cuentas, text="Eliminar", command=eliminar_cuenta)
     btn_eliminar.pack(side=tk.LEFT, padx=10, pady=10)
 
-    # Cargar los datos de la tabla 'Cuentas' en el Treeview
     try:
         conn = sqlite3.connect('diccionarios/base_dat.db')
         cursor = conn.cursor()
 
-        # Obtener todos los registros de la tabla Cuentas
-        cursor.execute("SELECT ID, Titular, Entidad FROM Cuentas")
+        # Verificar si la tabla 'cuentas' existe
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='cuentas';")
+        if cursor.fetchone() is None:
+            messagebox.showerror("Error", "La tabla 'Cuentas' no existe.")
+            return
+
+        # Obtener todos los registros de la tabla 'cuentas'
+        cursor.execute("SELECT ID, Titular, Entidad FROM cuentas")
         rows = cursor.fetchall()
 
-        # Insertar los registros en el Treeview
-        for row in rows:
-            tree.insert("", "end", values=row)
+        if not rows:  # Si no hay registros en la tabla
+            messagebox.showinfo("Información", "La tabla 'Cuentas' está vacía.")
+        else:
+            # Insertar los registros en el Treeview
+            for row in rows:
+                tree.insert("", "end", values=row)
 
         # Cerrar la conexión
         conn.close()
 
     except Exception as e:
         messagebox.showerror("Error", f"No se pudo cargar los datos de la tabla 'Cuentas': {e}")
+
+
+def obtener_datos_clientes():
+    """Obtiene los datos de la tabla clientes desde la base de datos y formatea Capital y Fecha_inicio."""
+    conexion = sqlite3.connect("diccionarios/base_dat.db")  # Cambia el nombre si es diferente
+    cursor = conexion.cursor()
+    
+    query = "SELECT Cedula, Nombre, Telefono, Direccion, Placa, Fecha_inicio, Tipo_contrato, Capital, Valor_cuota FROM clientes"
+    cursor.execute(query)
+    datos = cursor.fetchall()
+    
+    conexion.close()
+
+    # Formatear los datos
+    datos_formateados = []
+    for fila in datos:
+        cedula, nombre, telefono, direccion, placa, fecha_inicio, tipo_contrato, capital, valor_cuota = fila
+        
+        # Formatear la fecha si existe
+        if fecha_inicio:
+            try:
+                fecha_inicio = datetime.strptime(fecha_inicio, "%Y-%m-%d").strftime("%d-%m-%Y")
+            except ValueError:
+                fecha_inicio = "Formato Inválido"  # En caso de error con la fecha
+        
+        # Formatear capital sin decimales
+        capital = int(capital) if capital is not None else 0
+        
+        datos_formateados.append((cedula, nombre, telefono, direccion, placa, fecha_inicio, tipo_contrato, capital, valor_cuota))
+
+    return datos_formateados
+
+def ajustar_columnas(tree):
+    """Ajusta automáticamente el ancho de las columnas en función del contenido."""
+    for col in tree["columns"]:
+        tree.column(col, anchor="center")  # Justificar contenido al centro
+        
+        max_len = len(col)  # Inicia con el ancho del encabezado
+        
+        for item in tree.get_children():
+            text = str(tree.item(item, "values")[tree["columns"].index(col)])
+            max_len = max(max_len, len(text))
+
+        tree.column(col, width=max_len * 10)  # Ajusta el ancho en función del contenido
+
+def abrir_ventana_clientes():
+    ventana_clientes = tk.Toplevel()
+    ventana_clientes.title("Clientes")
+    ventana_clientes.geometry("900x600")
+
+    # Crear un Frame para contener el Treeview y la Scrollbar
+    frame_tree = ttk.Frame(ventana_clientes)
+    frame_tree.grid(row=0, column=0, columnspan=6, sticky="nsew", padx=10, pady=10)
+
+    # Crear el Treeview dentro del Frame
+    columnas = ("Cedula", "Nombre", "Telefono", "Direccion", 
+                "Placa", "Fecha_inicio", "Tipo_contrato", 
+                "Capital", "Valor_cuota")
+
+    tree = ttk.Treeview(frame_tree, columns=columnas, show="headings")
+
+    # Configurar encabezados y justificar contenido al centro
+    for col in columnas:
+        tree.heading(col, text=col)
+        tree.column(col, anchor="center")
+
+    # Crear Scrollbar dentro del Frame
+    scrollbar = ttk.Scrollbar(frame_tree, orient="vertical", command=tree.yview)
+    tree.configure(yscrollcommand=scrollbar.set)
+
+    # Ubicar Treeview y Scrollbar con grid dentro del Frame
+    tree.grid(row=0, column=0, sticky="nsew")
+    scrollbar.grid(row=0, column=1, sticky="ns")
+
+    # Configurar expansión del Frame
+    frame_tree.columnconfigure(0, weight=1)
+    frame_tree.rowconfigure(0, weight=1)
+
+    # Llenar el Treeview con datos de la base de datos
+    for fila in obtener_datos_clientes():
+        tree.insert("", "end", values=fila)
+
+    # Ajustar automáticamente el ancho de las columnas después de insertar los datos
+    ajustar_columnas(tree)
+
+    # Labels y Entries para la información del cliente
+    labels_texts = ["Cédula:", "Nombre:", "Teléfono:", "Dirección:", 
+                    "Placa:", "Fecha Inicio:", "Tipo Contrato:", 
+                    "Capital:", "Valor Cuota:"]
+    
+    entries = {}
+    for i, text in enumerate(labels_texts):
+        lbl = ttk.Label(ventana_clientes, text=text)
+        lbl.grid(row=i+1, column=0, padx=5, pady=5, sticky="e")
+        
+        entry = ttk.Entry(ventana_clientes)
+        entry.grid(row=i+1, column=1, padx=5, pady=5, sticky="w")
+        
+        entries[text] = entry  # Guardamos las entradas en un diccionario
+
+    # Botón para cerrar la ventana
+    btn_cerrar = ttk.Button(ventana_clientes, text="Cerrar", command=ventana_clientes.destroy)
+    btn_cerrar.grid(row=len(labels_texts)+1, column=0, columnspan=2, pady=10)
+
+    # Expansión de filas y columnas
+    ventana_clientes.columnconfigure(1, weight=1)
+    ventana_clientes.rowconfigure(0, weight=1)
+
+    return ventana_clientes  # Si quieres capturar la ventana creada
+
+# Código para probar la ventana de clientes de forma independiente
+if __name__ == "__main__":
+    root = tk.Tk()
+    root.withdraw()  # Ocultamos la ventana principal
+    abrir_ventana_clientes()
+    root.mainloop()
 
 
 
@@ -264,7 +382,7 @@ def cargar_nequi_opciones():
         cursor = conn.cursor()
 
         # Obtener las columnas 'Entidad' y 'Titular' de la tabla 'Cuentas'
-        cursor.execute("SELECT Entidad, Titular FROM Cuentas")
+        cursor.execute("SELECT Entidad, Titular FROM cuentas")
         rows = cursor.fetchall()
 
         # Crear la lista con la concatenación 'Entidad - Titular'

@@ -13,7 +13,7 @@ nequi_opciones = cargar_nequi_opciones()
 
 # Crear ventana principal
 ventana = tk.Tk()
-ventana.title("Registro de Motos")
+ventana.title("Registro de Tarifas")
 ventana.geometry("800x500")
 icono_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'img', 'inicio.ico')
 if os.path.exists(icono_path):
@@ -115,6 +115,9 @@ btn_limpiar.grid(row=0, column=2, padx=5, pady=10, sticky="ew")
 
 btn_cuentas = tk.Button(frame_botones, text="Cuentas", bg="green", fg="white", width=ancho_widget, command=abrir_ventana_cuentas)
 btn_cuentas.grid(row=0, column=3, padx=5, pady=10, sticky="ew")
+
+btn_clientes = tk.Button(frame_botones, text="Clientes", bg="blue", fg="white", width=ancho_widget, command=abrir_ventana_clientes)
+btn_clientes.grid(row=0, column=4, padx=5, pady=10, sticky="ew")
 
 
 
