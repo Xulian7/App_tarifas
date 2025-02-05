@@ -71,7 +71,7 @@ def actualizar_sugerencias(event):
     else:
         listbox_sugerencias.grid_forget()  # Ocultar si no hay resultados
 
-
+entry_nombre.bind("<KeyRelease>", actualizar_sugerencias)
 
 # Crear la función para seleccionar la sugerencia y actualizar los otros campos
 def seleccionar_sugerencia(event):
@@ -106,9 +106,6 @@ def seleccionar_sugerencia(event):
         # Ocultar el listbox_sugerencias después de seleccionar
         listbox_sugerencias.place_forget()
 
-
-
-
 tk.Label(frame_formulario, text="Placa:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
 entry_placa = tk.Entry(frame_formulario, width=ancho_widget, justify="center")
 entry_placa.grid(row=2, column=1, padx=5, pady=5, sticky="w")
@@ -133,8 +130,6 @@ frame_sugerencias.grid_columnconfigure(0, weight=1)  # Hace que el Listbox se ex
 # Vínculo para detectar selección
 listbox_sugerencias.bind("<<ListboxSelect>>", seleccionar_sugerencia)
 # Actualizar las sugerencias
-entry_nombre.bind("<KeyRelease>", actualizar_sugerencias)
-
 
 fecha_actual = datetime.now().strftime('%d-%m-%Y')
 tk.Label(frame_formulario, text="Fecha_sistema:").grid(row=0, column=3, padx=5, pady=5, sticky="e")
@@ -170,9 +165,9 @@ combo_nequi.grid(row=3, column=4, padx=5, pady=5, sticky="w")
 # Función para habilitar/deshabilitar el combo "Nequi" según el valor del combo "Tipo"
 def actualizar_nequi(*args):
     if combo_tipo.get() == "Consignación":
-        combo_nequi.config(state="normal")  # Habilitar el combo
+        combo_nequi.config(state="normal")  #Habilitar el combo
     else:
-        combo_nequi.config(state="disabled")  # Deshabilitar el combo
+        combo_nequi.config(state="disabled")  #Deshabilitar el combo
         combo_nequi.set("")  # Limpiar el contenido del combo
 # Asociar el cambio en el combo "Tipo" a la función
 combo_tipo.bind("<<ComboboxSelected>>", actualizar_nequi)
@@ -182,17 +177,14 @@ verificada_opciones = ["", "Sí", "No"]
 combo_verificada = ttk.Combobox(frame_formulario, values=verificada_opciones, state="readonly", width=ancho_widget)
 combo_verificada.grid(row=4, column=4, padx=5, pady=5, sticky="w")
 
-
-
 # Frame para los botones
 frame_botones = tk.Frame(frame_superior)
 frame_botones.grid(row=1, column=0, pady=10, sticky="w")
 # Botones con el mismo ancho
-btn_agregar = tk.Button(frame_botones, text="Registrar", width=ancho_widget)
+btn_agregar = tk.Button(frame_botones, text="Registrar", width=ancho_widget, command=lambda: agregar_registro(tree,entry_hoy, entry_cedula, entry_nombre, entry_placa, entry_monto, entry_referencia, entry_fecha, combo_tipo, combo_nequi, combo_verificada))
 btn_agregar.grid(row=0, column=0, padx=5, pady=10, sticky="ew")
 
-
-btn_consultar = tk.Button(frame_botones, text="Consultar", width=ancho_widget, command=lambda: cargar_db(tree, entry_cedula, entry_nombre, entry_placa, entry_referencia, entry_fecha, combo_tipo, combo_nequi, combo_verificada))
+btn_consultar = tk.Button(frame_botones, text="Consulta/Actualiza", width=ancho_widget, command=lambda: cargar_db(tree, entry_cedula, entry_nombre, entry_placa, entry_referencia, entry_fecha, combo_tipo, combo_nequi, combo_verificada))
 btn_consultar.grid(row=0, column=1, padx=5, pady=10, sticky="ew")
 
 btn_limpiar = tk.Button(frame_botones, text="Limpiar", bg="red", fg="white", width=ancho_widget, command=lambda: limpiar_formulario(entry_cedula, entry_nombre, entry_placa, entry_monto, entry_referencia, entry_fecha, combo_tipo, combo_nequi, combo_verificada, listbox_sugerencias, tree))
@@ -205,26 +197,65 @@ btn_clientes = tk.Button(frame_botones, text="Clientes", bg="blue", fg="white", 
 btn_clientes.grid(row=0, column=4, padx=5, pady=10, sticky="ew")
 
 
-
-
 # Reservar espacio para la sección vacía
 frame_vacio = tk.Frame(frame_superior, height=20)
 frame_vacio.grid(row=2, column=0, pady=5)
-
-
 
 # Treeview con scrollbar
 tree_frame = tk.Frame(ventana)
 tree_frame.pack(fill="both", expand=True)
 scroll_y = ttk.Scrollbar(tree_frame, orient="vertical")
 scroll_y.pack(side="right", fill="y")
-tree = ttk.Treeview(tree_frame, columns=("Fecha_sistema", "Fecha_registro", "Cedula", "Nombre", "Placa", "Valor", "Tipo", "Nombre_cuenta", "Referencia", "Verificada"), show="headings", yscrollcommand=scroll_y.set)
+tree = ttk.Treeview(tree_frame, columns=("id", "Fecha_sistema", "Fecha_registro", "Cedula", "Nombre", "Placa", "Valor", "Tipo", "Nombre_cuenta", "Referencia", "Verificada"), show="headings", yscrollcommand=scroll_y.set)
 scroll_y.config(command=tree.yview)
+
+# Aplicar estilo para los encabezados (color de fondo y texto)
+style = ttk.Style()
+style.configure("Treeview.Heading", background="lightblue", foreground="darkblue", font=("Helvetica", 10, "bold"))
+
 tree.tag_configure("rojo_bold", foreground="red", font=("Helvetica", 10, "bold"))
 for col in tree["columns"]:
     tree.heading(col, text=col)
     tree.column(col, anchor="center")
 tree.pack(fill="both", expand=True)
 
+def on_double_click(event, tree):
+    # Obtener el item seleccionado
+    selected_item = tree.selection()
+    if not selected_item:
+        return
+
+    # Obtener los valores del item
+    item_values = tree.item(selected_item, "values")
+    if not item_values:
+        return
+
+    # Extraer los valores
+    id_registro = item_values[0]  # ID está en la primera columna
+    verificada = item_values[10]  # 'Verificada' está en la última columna
+
+    # Verificar si el estado es "NO"
+    if verificada.upper() == "NO":
+        confirmar = messagebox.askyesno("Confirmación", "¿Desea marcar este registro como verificado?")
+        if confirmar:
+            try:
+                # Conectar a la base de datos y actualizar el estado
+                conn = sqlite3.connect("diccionarios/base_dat.db")
+                cursor = conn.cursor()
+                cursor.execute("UPDATE registros SET Verificada = 'SI' WHERE id = ?", (id_registro,))
+                conn.commit()
+                conn.close()
+
+                # Actualizar el Treeview
+                new_values = list(item_values)
+                new_values[10] = "SI"  # Cambiar el estado en la visualización
+                tree.item(selected_item, values=new_values)
+
+                messagebox.showinfo("Éxito", "Registro actualizado correctamente.")
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo actualizar el registro: {e}")
+
+# Asociar el evento al Treeview
+tree.bind("<Double-1>", lambda event: on_double_click(event, tree))
 
 ventana.mainloop()
