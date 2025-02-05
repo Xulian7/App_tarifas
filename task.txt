@@ -1,0 +1,8 @@
+Revisar carga del listado de cuentas cuando se crea una nueva (actualizacion del combobox)
+Registro de cliente nuevo con validacion de placa y cedula
+Registro de pago nuevo con carga de datos segun cedula o placa validando referencia (no admite duplicados)
+Cambio de estado de validada desde doble click del treeview (pasando a la base de datos y actualizando el tree)
+
+Integracion de las UI de OPER y DEV
+
+

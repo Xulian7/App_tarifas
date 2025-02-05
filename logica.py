@@ -94,7 +94,7 @@ def cargar_db(tree, entry_cedula, entry_nombre, entry_placa, entry_referencia, e
         messagebox.showerror("Error", f"No se pudo cargar los datos desde la base de datos: {e}")
 
 def limpiar_formulario(entry_cedula, entry_nombre, entry_placa, entry_monto, entry_referencia, entry_fecha,
-combo_tipo, combo_nequi, combo_verificada, tree):
+combo_tipo, combo_nequi, combo_verificada, listbox_sugerencias, tree):
     # Limpiar campos de texto (Entry)
     entry_cedula.focus_set()
     entry_cedula.delete(0, tk.END)
@@ -108,6 +108,7 @@ combo_tipo, combo_nequi, combo_verificada, tree):
     combo_tipo.set('')  # Resetear el ComboBox de Tipo
     combo_nequi.set('')  # Resetear el ComboBox de Nequi
     combo_verificada.set('')  # Resetear el ComboBox de Verificada
+    listbox_sugerencias.grid_forget()
     
     # Limpiar Treeview
     for row in tree.get_children():
