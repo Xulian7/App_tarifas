@@ -6,6 +6,7 @@ import sqlite3
 import os
 from datetime import datetime
 import pandas as pd
+from tkcalendar import DateEntry
 
 def cargar_db(tree, entry_cedula, entry_nombre, entry_placa, entry_referencia, entry_fecha, combo_tipo, combo_nequi, combo_verificada):
     try:
@@ -253,7 +254,7 @@ def obtener_datos_clientes():
     conexion = sqlite3.connect("diccionarios/base_dat.db")  # Cambia el nombre si es diferente
     cursor = conexion.cursor()
     
-    query = "SELECT Cedula, Nombre, Telefono, Direccion, Placa, Fecha_inicio, Tipo_contrato, Capital, Valor_cuota FROM clientes"
+    query = "SELECT Cedula, Nombre, Telefono, Direccion, Placa, Fecha_inicio, Fecha_final, Tipo_contrato, Capital, Valor_cuota FROM clientes"
     cursor.execute(query)
     datos = cursor.fetchall()
     
@@ -262,7 +263,7 @@ def obtener_datos_clientes():
     # Formatear los datos
     datos_formateados = []
     for fila in datos:
-        cedula, nombre, telefono, direccion, placa, fecha_inicio, tipo_contrato, capital, valor_cuota = fila
+        cedula, nombre, telefono, direccion, placa, fecha_inicio, fecha_final, tipo_contrato, capital, valor_cuota = fila
         
         # Formatear la fecha si existe
         if fecha_inicio:
@@ -274,7 +275,7 @@ def obtener_datos_clientes():
         # Formatear capital sin decimales
         capital = int(capital) if capital is not None else 0
         
-        datos_formateados.append((cedula, nombre, telefono, direccion, placa, fecha_inicio, tipo_contrato, capital, valor_cuota))
+        datos_formateados.append((cedula, nombre, telefono, direccion, placa, fecha_inicio, fecha_final, tipo_contrato, capital, valor_cuota))
 
     return datos_formateados
 
@@ -282,15 +283,11 @@ def ajustar_columnas(tree):
     """Ajusta automáticamente el ancho de las columnas en función del contenido."""
     for col in tree["columns"]:
         tree.column(col, anchor="center")  # Justificar contenido al centro
-        
         max_len = len(col)  # Inicia con el ancho del encabezado
-        
         for item in tree.get_children():
             text = str(tree.item(item, "values")[tree["columns"].index(col)])
             max_len = max(max_len, len(text))
-
         tree.column(col, width=max_len * 10)  # Ajusta el ancho en función del contenido
-
 
 def abrir_ventana_clientes():
     ventana_clientes = tk.Toplevel()
@@ -303,7 +300,7 @@ def abrir_ventana_clientes():
 
     # Crear el Treeview dentro del Frame
     columnas = ("Cédula", "Nombre", "Teléfono", "Dirección", 
-                "Placa", "Fecha Inicio", "Tipo Contrato", 
+                "Placa", "Fecha Inicio", "Fecha_final", "Tipo Contrato", 
                 "Capital", "Valor Cuota")
 
     tree = ttk.Treeview(frame_tree, columns=columnas, show="headings")
@@ -331,30 +328,37 @@ def abrir_ventana_clientes():
     # Llenar el Treeview con datos de la base de datos
     for fila in obtener_datos_clientes():
         tree.insert("", "end", values=fila)
-
     # Ajustar automáticamente el ancho de las columnas después de insertar los datos
     ajustar_columnas(tree)
 
-
-
+            # Función para configurar correctamente los DateEntry
+    def create_date_entry(parent):
+        return DateEntry(parent, width=27, background='darkblue', 
+                        foreground='white', borderwidth=2, 
+                        date_pattern='dd-MM-yyyy',  # Establecer el formato Día-Mes-Año
+                        locale='es_ES')
     # Frame para los Labels y Entries
     frame_form = ttk.LabelFrame(ventana_clientes, text="Información del Cliente")
     frame_form.grid(row=1, column=0, columnspan=4, padx=10, pady=10, sticky="nsew")
-
+    # Etiquetas y entradas
     labels_texts = ["Cédula:", "Nombre:", "Teléfono:", "Dirección:", 
-                    "Placa:", "Fecha Inicio:", "Tipo Contrato:", 
+                    "Placa:", "Fecha Inicio:", "Fecha final:", "Tipo Contrato:", 
                     "Capital:", "Valor Cuota:"]
-
     entries = {}
-    
+
     for i, text in enumerate(labels_texts):
         lbl = ttk.Label(frame_form, text=text)
         lbl.grid(row=i//2, column=(i%2)*2, padx=5, pady=5, sticky="e")
-
-        entry = ttk.Entry(frame_form, width=30)
+        
+        if "Fecha" in text:  # Usar DateEntry solo para fechas
+            entry = create_date_entry(frame_form)
+        else:  # Si no, usar Entry normal
+            entry = ttk.Entry(frame_form, width=30)
+        
         entry.grid(row=i//2, column=(i%2)*2+1, padx=5, pady=5, sticky="w")
-
         entries[text] = entry  # Guardamos las entradas en un diccionario
+    
+    
 
     # Frame para los botones
     frame_buttons = ttk.Frame(ventana_clientes)
@@ -370,21 +374,11 @@ def abrir_ventana_clientes():
     btn_inhabilitar = ttk.Button(frame_buttons, text="Inhabilitar", command=lambda: print("Función Inhabilitar"))
     btn_inhabilitar.grid(row=0, column=2, padx=10)
 
-
-
     # Expansión de filas y columnas
     ventana_clientes.columnconfigure(0, weight=1)
     ventana_clientes.rowconfigure(0, weight=1)
 
     return ventana_clientes  # Si quieres capturar la ventana creada
-
-# Código para probar la ventana de clientes de forma independiente
-if __name__ == "__main__":
-    root = tk.Tk()
-    root.withdraw()  # Ocultamos la ventana principal
-    abrir_ventana_clientes()
-    root.mainloop()
-
 
 def cargar_nequi_opciones():
     try:
@@ -407,10 +401,6 @@ def cargar_nequi_opciones():
     except Exception as e:
         print(f"Error al cargar los datos: {e}")
         return []
-
-import sqlite3
-from tkinter import messagebox
-from datetime import datetime
 
 def convertir_fecha(fecha_str):
     """Convierte una fecha de formato dd-mm-yyyy a yyyy-mm-dd."""
@@ -478,5 +468,8 @@ def agregar_registro(tree, entry_hoy, entry_cedula, entry_nombre, entry_placa, e
 
     except sqlite3.Error as e:
         messagebox.showerror("Error", f"Ocurrió un error al guardar en la base de datos: {e}")
+
+
+
 
 

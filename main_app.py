@@ -182,24 +182,30 @@ frame_botones = tk.Frame(frame_superior)
 frame_botones.grid(row=1, column=0, pady=10, sticky="w")
 # Botones con el mismo ancho
 btn_agregar = tk.Button(frame_botones, text="Registrar", width=ancho_widget, command=lambda: agregar_registro(tree,entry_hoy, entry_cedula, entry_nombre, entry_placa, entry_monto, entry_referencia, entry_fecha, combo_tipo, combo_nequi, combo_verificada))
-btn_agregar.grid(row=0, column=0, padx=5, pady=10, sticky="ew")
+btn_agregar.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
 
 btn_consultar = tk.Button(frame_botones, text="Consulta/Actualiza", width=ancho_widget, command=lambda: cargar_db(tree, entry_cedula, entry_nombre, entry_placa, entry_referencia, entry_fecha, combo_tipo, combo_nequi, combo_verificada))
-btn_consultar.grid(row=0, column=1, padx=5, pady=10, sticky="ew")
+btn_consultar.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
 
 btn_limpiar = tk.Button(frame_botones, text="Limpiar", bg="red", fg="white", width=ancho_widget, command=lambda: limpiar_formulario(entry_cedula, entry_nombre, entry_placa, entry_monto, entry_referencia, entry_fecha, combo_tipo, combo_nequi, combo_verificada, listbox_sugerencias, tree))
-btn_limpiar.grid(row=0, column=2, padx=5, pady=10, sticky="ew")
+btn_limpiar.grid(row=0, column=2, padx=5, pady=5, sticky="ew")
 
 btn_cuentas = tk.Button(frame_botones, text="Cuentas", bg="green", fg="white", width=ancho_widget, command=abrir_ventana_cuentas)
-btn_cuentas.grid(row=0, column=3, padx=5, pady=10, sticky="ew")
+btn_cuentas.grid(row=2, column=0, padx=5, pady=5, sticky="ew")
 
 btn_clientes = tk.Button(frame_botones, text="Clientes", bg="blue", fg="white", width=ancho_widget, command=abrir_ventana_clientes)
-btn_clientes.grid(row=0, column=4, padx=5, pady=10, sticky="ew")
+btn_clientes.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
 
+btn_socios = tk.Button(frame_botones, text="Socios", bg="orange", fg="white", width=ancho_widget)
+btn_socios.grid(row=2, column=2, padx=5, pady=5, sticky="ew")
 
 # Reservar espacio para la sección vacía
 frame_vacio = tk.Frame(frame_superior, height=20)
 frame_vacio.grid(row=2, column=0, pady=5)
+
+
+
+
 
 # Treeview con scrollbar
 tree_frame = tk.Frame(ventana)
@@ -208,10 +214,6 @@ scroll_y = ttk.Scrollbar(tree_frame, orient="vertical")
 scroll_y.pack(side="right", fill="y")
 tree = ttk.Treeview(tree_frame, columns=("id", "Fecha_sistema", "Fecha_registro", "Cedula", "Nombre", "Placa", "Valor", "Tipo", "Nombre_cuenta", "Referencia", "Verificada"), show="headings", yscrollcommand=scroll_y.set)
 scroll_y.config(command=tree.yview)
-
-# Aplicar estilo para los encabezados (color de fondo y texto)
-style = ttk.Style()
-style.configure("Treeview.Heading", background="lightblue", foreground="darkblue", font=("Helvetica", 10, "bold"))
 
 tree.tag_configure("rojo_bold", foreground="red", font=("Helvetica", 10, "bold"))
 for col in tree["columns"]:

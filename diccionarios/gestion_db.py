@@ -59,7 +59,6 @@ def validar_credenciales():
 
     return False
 
-# Función para crear la base de datos
 def create_database():
     try:
         db_exists = os.path.exists(db_path)
@@ -68,6 +67,8 @@ def create_database():
 
         if not db_exists:
             messagebox.showinfo("Éxito", "Base de datos creada correctamente.")
+
+        cursor.execute("PRAGMA foreign_keys = ON;")
 
         tables = {
             "clientes": """
@@ -78,6 +79,7 @@ def create_database():
                     Direccion TEXT,
                     Placa TEXT UNIQUE,
                     Fecha_inicio TEXT,
+                    Fecha_final TEXT,
                     Tipo_contrato TEXT,
                     Capital REAL,
                     Valor_cuota REAL
@@ -95,7 +97,9 @@ def create_database():
                     Tipo TEXT,
                     Nombre_cuenta TEXT,
                     Referencia TEXT,
-                    Verificada TEXT
+                    Verificada TEXT,
+                    FOREIGN KEY (Cedula) REFERENCES clientes(Cedula),
+                    FOREIGN KEY (Placa) REFERENCES clientes(Placa)
                 )
             """,
             "cuentas": """
@@ -104,10 +108,17 @@ def create_database():
                     Titular TEXT,
                     Entidad TEXT
                 )
+            """,
+            "asociados": """
+                CREATE TABLE IF NOT EXISTS asociados (
+                    Cedula_asoc TEXT PRIMARY KEY,
+                    Nombre_asoc TEXT,
+                    Placa TEXT,
+                    FOREIGN KEY (Placa) REFERENCES clientes(Placa)
+                )
             """
         }
 
-    
         for table_name, query in tables.items():
             cursor.execute(query)
 
@@ -117,7 +128,8 @@ def create_database():
 
     except Exception as e:
         messagebox.showerror("Error", f"Ocurrió un error: {e}")
-
+        
+        
 def migrar_clientes():
     try:
         if not os.path.exists(excel_path):
@@ -130,7 +142,7 @@ def migrar_clientes():
         # Definir las columnas esperadas en la base de datos
         columnas_db = [
             "Cedula", "Nombre", "Telefono", "Direccion", "Placa",
-            "Fecha_inicio", "Tipo_contrato", "Capital", "Valor_cuota"
+            "Fecha_inicio", "Fecha_final", "Tipo_contrato", "Capital", "Valor_cuota"
         ]
 
         # Validar que las columnas en Excel coincidan con las esperadas
@@ -146,8 +158,8 @@ def migrar_clientes():
         for _, row in df.iterrows():
             try:
                 cursor.execute("""
-                    INSERT INTO clientes (Cedula, Nombre, Telefono, Direccion, Placa, Fecha_inicio, Tipo_contrato, Capital, Valor_cuota)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO clientes (Cedula, Nombre, Telefono, Direccion, Placa, Fecha_inicio, Fecha_final, Tipo_contrato, Capital, Valor_cuota)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,?)
                 """, tuple(row[column] for column in columnas_db))
             except sqlite3.IntegrityError as e:
                 messagebox.showwarning("Advertencia", f"No se pudo insertar el cliente {row['Cedula']} (Duplicado o error en datos): {e}")
@@ -259,6 +271,17 @@ def migrar_cuentas():
 
     except Exception as e:
         messagebox.showerror("Error", f"Ocurrió un problema durante la migración: {e}")
+        
+        
+def migrar_asociados():
+    try:
+        df = pd.read_excel(excel_path, sheet_name='asociados')
+        conn = sqlite3.connect(db_path)
+        df.to_sql('asociados', conn, if_exists='append', index=False)
+        conn.close()
+        messagebox.showinfo("Éxito", "Datos migrados correctamente a la tabla asociados.")
+    except Exception as e:
+        messagebox.showerror("Error", f"Ocurrió un error al migrar los datos: {e}")
 
 
 # Validar credenciales antes de abrir la interfaz
@@ -281,6 +304,7 @@ if validar_credenciales():
     tk.Button(root, text="Migrar Clientes", command=migrar_clientes, **btn_style).grid(row=1, column=0, padx=10, pady=5)
     tk.Button(root, text="Migrar Registros", command=migrar_registros, **btn_style).grid(row=2, column=0, padx=10, pady=5)
     tk.Button(root, text="Migrar Cuentas", command=migrar_cuentas, **btn_style).grid(row=3, column=0, padx=10, pady=5)
+    tk.Button(root, text="Migrar asociados", command=migrar_asociados, **btn_style).grid(row=4, column=0, padx=10, pady=5)
 
     root.mainloop()
 else:
