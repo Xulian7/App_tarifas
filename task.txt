@@ -1,7 +1,0 @@
-Revisar carga del listado de cuentas cuando se crea una nueva (actualizacion del combobox)
-Registro de cliente nuevo con validacion de placa y cedula
-
-
-Integracion de las UI de OPER y DEV
-
-

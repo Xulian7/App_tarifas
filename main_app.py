@@ -110,7 +110,7 @@ tk.Label(frame_formulario, text="Placa:").grid(row=2, column=0, padx=5, pady=5, 
 entry_placa = tk.Entry(frame_formulario, width=ancho_widget, justify="center")
 entry_placa.grid(row=2, column=1, padx=5, pady=5, sticky="w")
 
-tk.Label(frame_formulario, text="Monto:").grid(row=3, column=0, padx=5, pady=5, sticky="e")
+tk.Label(frame_formulario, text="Valor:").grid(row=3, column=0, padx=5, pady=5, sticky="e")
 entry_monto = tk.Entry(frame_formulario, width=ancho_widget, justify="center")
 entry_monto.grid(row=3, column=1, padx=5, pady=5, sticky="w")
 
@@ -196,16 +196,12 @@ btn_cuentas.grid(row=2, column=0, padx=5, pady=5, sticky="ew")
 btn_clientes = tk.Button(frame_botones, text="Clientes", bg="blue", fg="white", width=ancho_widget, command=abrir_ventana_clientes)
 btn_clientes.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
 
-btn_socios = tk.Button(frame_botones, text="Socios", bg="orange", fg="white", width=ancho_widget)
-btn_socios.grid(row=2, column=2, padx=5, pady=5, sticky="ew")
+btn_extracto = tk.Button(frame_botones, text="Extracto", bg="orange", fg="white", width=ancho_widget, command=lambda: mostrar_registros(entry_nombre, entry_fecha))
+btn_extracto.grid(row=2, column=2, padx=5, pady=5, sticky="ew")
 
 # Reservar espacio para la sección vacía
 frame_vacio = tk.Frame(frame_superior, height=20)
 frame_vacio.grid(row=2, column=0, pady=5)
-
-
-
-
 
 # Treeview con scrollbar
 tree_frame = tk.Frame(ventana)
