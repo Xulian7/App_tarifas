@@ -1,16 +1,17 @@
+import pandas as pd
 import tkinter as tk
 import tkinter.font as tkFont
-from tkinter import messagebox
+from tkinter import font
+from tkinter import filedialog, messagebox
 from tkinter import ttk
 import sqlite3
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 from tkcalendar import DateEntry
 import locale
 
-# Establecer el idioma en español para obtener el nombre del mes
-locale.setlocale(locale.LC_TIME, "es_CO.utf8")
+# Establecer configuraciones locales - español
 locale.setlocale(locale.LC_ALL, 'es_CO.utf8')
 
 def cargar_db(tree, entry_cedula, entry_nombre, entry_placa, entry_referencia, entry_fecha, combo_tipo, combo_nequi, combo_verificada):
@@ -221,7 +222,7 @@ def obtener_datos_clientes():
     conexion = sqlite3.connect("diccionarios/base_dat.db")  # Cambia el nombre si es diferente
     cursor = conexion.cursor()
     
-    query = "SELECT Cedula, Nombre, Telefono, Direccion, Placa, Fecha_inicio, Fecha_final, Tipo_contrato, Capital, Valor_cuota FROM clientes"
+    query = "SELECT Cedula, Nombre, Telefono, Direccion, Placa, Tarjeta_propiedad, Fecha_inicio, Fecha_final, Tipo_contrato, Valor_cuota FROM clientes"
     cursor.execute(query)
     datos = cursor.fetchall()
     
@@ -230,7 +231,7 @@ def obtener_datos_clientes():
     # Formatear los datos
     datos_formateados = []
     for fila in datos:
-        cedula, nombre, telefono, direccion, placa, fecha_inicio, fecha_final, tipo_contrato, capital, valor_cuota = fila
+        cedula, nombre, telefono, direccion, placa, Tarjeta , fecha_inicio, fecha_final, tipo_contrato, valor_cuota = fila
         
         # Formatear la fecha si existe
         if fecha_inicio:
@@ -245,10 +246,9 @@ def obtener_datos_clientes():
             except ValueError:
                 fecha_final = "Formato Inválido"  # En caso de error con la fecha
         
-        # Formatear capital sin decimales
-        capital = int(capital) if capital is not None else 0
         
-        datos_formateados.append((cedula, nombre, telefono, direccion, placa, fecha_inicio, fecha_final, tipo_contrato, capital, valor_cuota))
+        
+        datos_formateados.append((cedula, nombre, telefono, direccion, placa, Tarjeta , fecha_inicio, fecha_final, tipo_contrato, valor_cuota))
 
     return datos_formateados
 
@@ -296,6 +296,11 @@ def abrir_ventana_clientes():
     ventana_clientes = tk.Toplevel()
     ventana_clientes.title("Clientes")
     ventana_clientes.geometry("900x600")
+    icono_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'img', 'inicio.ico')
+    if os.path.exists(icono_path):
+        ventana_clientes.iconbitmap(icono_path)
+    else:
+        print("No se encontró el icono en la ruta especificada")
 
     # Crear un Frame para contener el Treeview y la Scrollbar
     frame_tree = ttk.Frame(ventana_clientes)
@@ -303,8 +308,7 @@ def abrir_ventana_clientes():
 
     # Crear el Treeview dentro del Frame
     columnas = ("Cédula", "Nombre", "Teléfono", "Dirección", 
-                "Placa", "Fecha Inicio", "Fecha Final", "Tipo Contrato", 
-                "Capital", "Valor Cuota")
+                "Placa","Tarjeta_propiedad", "Fecha Inicio", "Fecha Final", "Tipo Contrato", "Valor Cuota")
 
     tree = ttk.Treeview(frame_tree, columns=columnas, show="headings")
 
@@ -367,29 +371,25 @@ def abrir_ventana_clientes():
     nombre_var.trace_add("write", lambda *args: filtrar_treeview(tree, nombre_var))
     lbl_nombre = ttk.Label(frame_form, text="Nombre:")
     lbl_nombre.grid(row=0, column=2, padx=5, pady=5, sticky="w")
-    
-    
+
     def filtrar_treeview(tree, nombre_var):
-        filtro = nombre_var.get().strip().lower()  # Obtener texto del entry y convertir a minúsculas
-        items = tree.get_children()  # Obtener todos los ítems actuales en el treeview
+        filtro = nombre_var.get().strip().lower()
+        items = tree.get_children()
 
-        # Si el filtro está vacío, restaurar los datos originales
         if not filtro:
-            tree.delete(*items)  # Borrar todo el contenido del Treeview
-            for fila in datos_originales:  # datos_originales debe contener la data inicial sin filtrar
-                tree.insert("", "end", values=fila)  # Reinsertar todos los datos
-            return  # Salir de la función
-
-        # Filtrar y actualizar el Treeview
-        tree.delete(*items)  # Limpiar treeview antes de insertar resultados filtrados
-        for fila in datos_originales:
-            if filtro in fila[1].lower():  # Asumiendo que la columna "Nombre" está en el índice 1
+            tree.delete(*items)
+            for fila in datos_originales:
                 tree.insert("", "end", values=fila)
+            return
 
+        tree.delete(*items)
+        for fila in datos_originales:
+            if filtro in fila[1].lower():
+                tree.insert("", "end", values=fila)
 
     entries["Nombre"] = ttk.Entry(frame_form, textvariable=nombre_var, width=30)
     entries["Nombre"].grid(row=0, column=3, padx=5, pady=5, sticky="w")
-    
+
     lbl_telefono = ttk.Label(frame_form, text="Teléfono:")
     lbl_telefono.grid(row=0, column=4, padx=5, pady=5, sticky="w")
     entries["Teléfono"] = ttk.Entry(frame_form, width=30)
@@ -402,98 +402,66 @@ def abrir_ventana_clientes():
 
     placa_var = tk.StringVar()
     placa_var.trace_add("write", lambda *args: placa_var.set(placa_var.get().upper()))
+    placa_var.trace_add("write", lambda *args: consultar_tarjeta_propiedad(placa_var.get()))
     lbl_placa = ttk.Label(frame_form, text="Placa:")
     lbl_placa.grid(row=1, column=2, padx=5, pady=5, sticky="w")
     entries["Placa"] = ttk.Entry(frame_form, textvariable=placa_var, width=30)
     entries["Placa"].grid(row=1, column=3, padx=5, pady=5, sticky="w")
 
+    lbl_tarjeta_propiedad = ttk.Label(frame_form, text="Tarjeta Propiedad:")
+    lbl_tarjeta_propiedad.grid(row=1, column=4, padx=5, pady=5, sticky="w")
+    entries["Tarjeta_propiedad"] = ttk.Entry(frame_form, width=30, state="readonly")
+    entries["Tarjeta_propiedad"].grid(row=1, column=5, padx=5, pady=5, sticky="w")
+
+    def consultar_tarjeta_propiedad(placa):
+        import sqlite3
+        conn = sqlite3.connect("diccionarios/base_dat.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT Tarjeta_propiedad FROM propietario WHERE Placa = ?", (placa,))
+        resultado = cursor.fetchone()
+        conn.close()
+        if resultado:
+            entries["Tarjeta_propiedad"].config(state="normal")
+            entries["Tarjeta_propiedad"].delete(0, tk.END)
+            entries["Tarjeta_propiedad"].insert(0, resultado[0])
+            entries["Tarjeta_propiedad"].config(state="readonly")
+
     lbl_fecha_inicio = ttk.Label(frame_form, text="Fecha Inicio:")
-    lbl_fecha_inicio.grid(row=1, column=4, padx=5, pady=5, sticky="w")
+    lbl_fecha_inicio.grid(row=2, column=0, padx=5, pady=5, sticky="w")
     entries["Fecha Inicio"] = create_date_entry(frame_form)
-    entries["Fecha Inicio"].grid(row=1, column=5, padx=5, pady=5, sticky="w")
+    entries["Fecha Inicio"].grid(row=2, column=1, padx=5, pady=5, sticky="w")
 
     lbl_fecha_final = ttk.Label(frame_form, text="Fecha Final:")
-    lbl_fecha_final.grid(row=2, column=0, padx=5, pady=5, sticky="w")
+    lbl_fecha_final.grid(row=2, column=2, padx=5, pady=5, sticky="w")
     entries["Fecha Final"] = create_date_entry(frame_form)
-    entries["Fecha Final"].grid(row=2, column=1, padx=5, pady=5, sticky="w")
+    entries["Fecha Final"].grid(row=2, column=3, padx=5, pady=5, sticky="w")
 
     lbl_tipo_contrato = ttk.Label(frame_form, text="Tipo Contrato:")
-    lbl_tipo_contrato.grid(row=2, column=2, padx=5, pady=5, sticky="w")
+    lbl_tipo_contrato.grid(row=2, column=4, padx=5, pady=5, sticky="w")
     tipos_opciones = ["Alquiler", "Opcion de compra", "Empeño"]
     entries["Tipo Contrato"] = ttk.Combobox(frame_form, values=tipos_opciones, state="readonly", width=30)
-    entries["Tipo Contrato"].grid(row=2, column=3, padx=5, pady=5, sticky="w")
+    entries["Tipo Contrato"].grid(row=2, column=5, padx=5, pady=5, sticky="w")
 
-    lbl_capital = ttk.Label(frame_form, text="Capital:")
-    lbl_capital.grid(row=2, column=4, padx=5, pady=5, sticky="w")
-    entries["Capital"] = ttk.Entry(frame_form, width=30)
-    entries["Capital"].grid(row=2, column=5, padx=5, pady=5, sticky="w")
 
     lbl_valor_cuota = ttk.Label(frame_form, text="Valor Cuota:")
-    lbl_valor_cuota.grid(row=3, column=0, padx=5, pady=5, sticky="w")
+    lbl_valor_cuota.grid(row=3, column=4, padx=5, pady=5, sticky="w")
     entries["Valor Cuota"] = ttk.Entry(frame_form, width=30)
-    entries["Valor Cuota"].grid(row=3, column=1, padx=5, pady=5, sticky="w")
+    entries["Valor Cuota"].grid(row=3, column=5, padx=5, pady=5, sticky="w")
     
     def limpiar_formulario():
         """Limpia todos los campos de entrada en el formulario."""
         for entry in entries.values():
                 entry.delete(0, "end")
                 entries["Tipo Contrato"].set("")  # Resetear el Combobox
+                entries["Tarjeta_propiedad"].config(state="normal")
+                entries["Tarjeta_propiedad"].delete(0, tk.END)
+                entries["Tarjeta_propiedad"].config(state="readonly")
     
     def registrar_cliente():
-        # Obtener valores del formulario
-        datos_cliente = {campo: entries[campo].get().strip() for campo in entries}
-
-        # Validar que ningún campo esté vacío
-        if any(valor == "" for valor in datos_cliente.values()):
-            messagebox.showwarning("Campos vacíos", "Todos los campos son obligatorios.")
-            return
-
-        # Convertir fechas
-        fecha_inicio = convertir_fecha(datos_cliente["Fecha Inicio"])
-        fecha_final = convertir_fecha(datos_cliente["Fecha Final"])
-
-        if fecha_inicio is None or fecha_final is None:
-            return  # Si hubo error en la conversión de fechas, no continuar
-
-        # Conectar a la base de datos
-        conexion = sqlite3.connect("diccionarios/base_dat.db")
-        cursor = conexion.cursor()
-
-        # Verificar si la cédula o la placa ya existen
-        cursor.execute("SELECT COUNT(*) FROM clientes WHERE Cedula = ? OR Placa = ?", 
-                    (datos_cliente["Cédula"], datos_cliente["Placa"]))
-        if cursor.fetchone()[0] > 0:
-            messagebox.showerror("Error", "Ya existe un cliente con esta cédula o placa.")
-            conexion.close()
-            return
-
-        # Insertar en la base de datos
-        try:
-            cursor.execute("""
-                INSERT INTO clientes (Cedula, Nombre, Telefono, Direccion, Placa, 
-                                    Fecha_inicio, Fecha_final, Tipo_contrato, 
-                                    Capital, Valor_cuota) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                datos_cliente["Cédula"], datos_cliente["Nombre"], datos_cliente["Teléfono"],
-                datos_cliente["Dirección"], datos_cliente["Placa"], fecha_inicio,
-                fecha_final, datos_cliente["Tipo Contrato"],
-                float(datos_cliente["Capital"]), float(datos_cliente["Valor Cuota"])
-            ))
-            conexion.commit()
-            messagebox.showinfo("Éxito", "Cliente registrado correctamente.")
-
-            # Limpiar el formulario
-            for entry in entries.values():
-                entry.delete(0, "end")
-
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo registrar el cliente: {str(e)}")
-        finally:
-            conexion.close()
+        pass
     
     def cargar_datos_desde_treeview():
-    #Carga los datos seleccionados del Treeview en los campos del formulario."""
+        # Carga los datos seleccionados del Treeview en los campos del formulario.
         seleccion = tree.selection()
         
         if not seleccion:
@@ -506,9 +474,8 @@ def abrir_ventana_clientes():
         if not valores:
             messagebox.showwarning("Advertencia", "No hay datos en la selección.")
             return
-
-        #print("Valores obtenidos desde el Treeview:", valores)  # Depuración
-
+        
+        #print(valores)
         # Asignación de valores a cada campo del formulario
         entries["Cédula"].delete(0, tk.END)
         entries["Cédula"].insert(0, valores[0])
@@ -520,21 +487,34 @@ def abrir_ventana_clientes():
         entries["Dirección"].insert(0, valores[3])
         entries["Placa"].delete(0, tk.END)
         entries["Placa"].insert(0, valores[4])
-        entries["Fecha Inicio"].set_date(valores[5])  # Para DateEntry
-        entries["Fecha Final"].set_date(valores[6])  # Para DateEntry
+        entries["Fecha Inicio"].set_date(valores[6])  # Para DateEntry
+        entries["Fecha Final"].set_date(valores[7])  # Para DateEntry
 
         # Manejo del Combobox de "Tipo Contrato"
         opciones_tipo_contrato = entries["Tipo Contrato"]["values"]
-        if valores[7] in opciones_tipo_contrato:
-            entries["Tipo Contrato"].set(valores[7])
+        if valores[8] in opciones_tipo_contrato:
+            entries["Tipo Contrato"].set(valores[8])
         else:
-            print(f"El valor '{valores[7]}' no está en las opciones del Combobox")
+            print(f"El valor '{valores[8]}' no está en las opciones del Combobox")
 
-        entries["Capital"].delete(0, tk.END)
-        entries["Capital"].insert(0, valores[8])
+
         entries["Valor Cuota"].delete(0, tk.END)
-        entries["Valor Cuota"].insert(0, valores[9])
-    
+        entries["Valor Cuota"].insert(0, valores[11])
+
+        # Consultar la base de datos para obtener la Tarjeta de Propiedad
+        conn = sqlite3.connect("diccionarios/base_dat.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT Tarjeta_propiedad FROM propietario WHERE Placa = ?", (valores[4],))
+        resultado = cursor.fetchone()
+        conn.close()
+        
+        if resultado:
+            entries["Tarjeta_propiedad"].config(state="normal")
+            entries["Tarjeta_propiedad"].delete(0, tk.END)
+            entries["Tarjeta_propiedad"].insert(0, resultado[0])
+            entries["Tarjeta_propiedad"].config(state="readonly")
+
+        
     # Frame para los botones
     frame_buttons = ttk.Frame(ventana_clientes)
     frame_buttons.grid(row=2, column=0, columnspan=4, pady=10)
@@ -692,7 +672,6 @@ def abrir_ventana_cuentas():
     ventana_cuentas.columnconfigure(0, weight=1)
     ventana_cuentas.rowconfigure(0, weight=1)
 
-
 def mostrar_registros(entry_nombre, entry_fecha):
     nombre = entry_nombre.get().strip()
     fecha_texto = entry_fecha.get().strip()
@@ -723,44 +702,48 @@ def mostrar_registros(entry_nombre, entry_fecha):
             # Obtener la Cédula, Nombre y Placa de la primera coincidencia
             cursor.execute("SELECT Cedula, Nombre, Placa FROM Registros WHERE Nombre = ? LIMIT 1", (nombre,))
             info_cliente = cursor.fetchone()
+            # Obtener valores de pagos, cuotas y plazos
+            cursor.execute("SELECT Fecha_inicio, Fecha_final, Valor_cuota FROM clientes WHERE Nombre = ?", (nombre,))
+            balance = cursor.fetchone()
+            # Buscar la suma de abonos en la tabla 'registros'
+            cursor.execute("SELECT COALESCE(SUM(Valor), 0) FROM registros WHERE Nombre = ?", (nombre,))
+            total_abonos = cursor.fetchone()[0]
+            
             
             if not info_cliente:
                 messagebox.showinfo("Sin resultados", "No se encontraron registros para el nombre dado.")
                 return
 
             cedula, nombre, placa = info_cliente
+            fecha_inicio_str, Fecha_final_str, valor_cuota = balance
+                    
+            # Calcular C_vencidas (días transcurridos desde Fecha_inicio hasta hoy)
+            fecha_inicio = datetime.strptime(fecha_inicio_str, "%Y-%m-%d")
+            C_totales = (fecha_inicio - datetime.strptime(Fecha_final_str, "%Y-%m-%d")).days
+            c_vencidas = (datetime.today() - fecha_inicio).days + 1
+            c_saldas = total_abonos / valor_cuota if valor_cuota else 0
 
-            # Definir consulta SQL dependiendo de si se ingresó una fecha o no
-            if mes and anio:
-                cursor.execute("""
-                    SELECT Fecha_registro, Valor, Tipo, Verificada 
-                    FROM Registros 
-                    WHERE Nombre = ? 
-                    AND strftime('%m', Fecha_registro) = ? 
-                    AND strftime('%Y', Fecha_registro) = ?
-                    ORDER BY Fecha_registro ASC
-                """, (nombre, f"{mes:02d}", str(anio)))
-            else:
-                cursor.execute("""
-                    SELECT Fecha_registro, Valor, Tipo, Verificada 
-                    FROM Registros 
-                    WHERE Nombre = ? 
-                    ORDER BY Fecha_registro ASC
-                """, (nombre,))
-            
+            # Definir consulta SQL a todos los registros
+            cursor.execute("""
+                SELECT Fecha_registro, Valor, Tipo, Referencia, Verificada 
+                FROM Registros 
+                WHERE Nombre = ? 
+                ORDER BY Fecha_registro ASC
+            """, (nombre,))
+        
             registros = cursor.fetchall()
             
-            # Calcular la suma total de los valores
-            Total_valores = sum(registro[1] for registro in registros)
-            total_formateado = locale.currency(Total_valores, grouping=True)
+            al_dia = round((c_vencidas-c_saldas)*valor_cuota, 2)
+            al_dia_formateado = locale.currency(al_dia, grouping=True)
 
     except sqlite3.Error as e:
         messagebox.showerror("Error", f"Ocurrió un error con la base de datos: {e}")
         return
+    
 
     # Crear una nueva ventana para mostrar los datos
     ventana = tk.Toplevel()
-    ventana.title("Registros Filtrados")
+    ventana.title("Historial de pagos")
 
     # Definir el título con "Totales" si no hay fecha
     titulo_texto = f"Extracto pagos {nombre_mes} - Leo Motos"
@@ -770,34 +753,108 @@ def mostrar_registros(entry_nombre, entry_fecha):
     # Zona superior con Cedula, Nombre y Placa
     frame_info = tk.Frame(ventana)
     frame_info.pack(pady=10, padx=10)
-
-    tk.Label(frame_info, text=f"Cédula: {cedula}", font=("Arial", 12, "bold")).grid(row=0, column=0, padx=5)
-    tk.Label(frame_info, text=f"Nombre: {nombre}", font=("Arial", 12, "bold")).grid(row=0, column=1, padx=5)
-    tk.Label(frame_info, text=f"Placa: {placa}", font=("Arial", 12, "bold")).grid(row=1, column=0, padx=5)
-    tk.Label(frame_info, text=f"Acumulado: {total_formateado}", font=("Arial", 12, "bold")).grid(row=1, column=1, padx=5)
+    
+    # Fuente en negrita para etiquetas / normal variables
+    bold_font = font.Font(family="Arial", size=10, weight="bold")
+    normal_font = font.Font(family="Arial", size=10, weight="normal")
+    
+    def create_label(frame, label_text, variable_text, row, col):
+        tk.Label(frame, text=label_text, font=bold_font).grid(row=row, column=col, padx=3, pady=3, sticky="w")
+        tk.Label(frame, text=variable_text, font=normal_font).grid(row=row, column=col+1, padx=3, pady=3, sticky="w")
+        
+    create_label(frame_info, "Cédula:", cedula, 0, 0)
+    create_label(frame_info, "Nombre:", nombre, 1, 0)
+    create_label(frame_info, "Placa:", placa, 2, 0)
+    create_label(frame_info, "Cuotas vencidas:", c_vencidas, 0, 4)
+    create_label(frame_info, "Cuotas pagas:", round(c_saldas, 2), 1, 4)
+    create_label(frame_info, "Cuotas pendientes:", round(c_vencidas-c_saldas, 2), 2, 4)
+    create_label(frame_info, "$ al dia:", al_dia_formateado, 3, 2)
     
     # Crear Treeview para mostrar los registros
     frame_tree = tk.Frame(ventana)
     frame_tree.pack(pady=10, padx=10, fill="both", expand=True)
+    columnas = ("Calendario", "Fecha_registro", "Valor", "Tipo", "Referencia" ,"Verificada")
+    tree = ttk.Treeview(frame_tree, columns=columnas, show="headings", selectmode="browse")
 
-    columnas = ("Fecha_registro", "Valor", "Tipo", "Verificada")
-    tree = ttk.Treeview(frame_tree, columns=columnas, show="headings")
-    
     # Definir encabezados
+    tree.heading("Calendario", text="Calendario")
     tree.heading("Fecha_registro", text="Fecha Registro")
     tree.heading("Valor", text="Valor")
     tree.heading("Tipo", text="Tipo")
+    tree.heading("Referencia", text="Referencia")
     tree.heading("Verificada", text="Verificada")
 
     # Ajustar ancho de columnas
     for col in columnas:
         tree.column(col, anchor="center", width=120)
 
+    # Definir un estilo para los registros con deuda
+    tree.tag_configure("deuda", foreground="red")
+    
+    # Inicializar variables para la fecha esperada
+    fecha_esperada = fecha_inicio
+    saldo_pendiente = valor_cuota  # Inicia con la cuota completa esperando ser cubierta
+        
     # Insertar los datos en el treeview con la fecha en formato DD-MM-YYYY
     for registro in registros:
         fecha_formateada = datetime.strptime(registro[0], "%Y-%m-%d").strftime("%d-%m-%Y")
-        tree.insert("", "end", values=(fecha_formateada, *registro[1:]))
+        valor_registro = registro[1]  # El valor del pago en la fila
+        fecha_pago = datetime.strptime(registro[0], "%Y-%m-%d")  # Fecha real del pago
+        valor_pago = registro[1]  # Monto del abono
+        
+        # Si el pago cubre la cuota esperada, actualizar fecha esperada
+        saldo_pendiente -= valor_pago
+        while saldo_pendiente < 0:  # Si cubrió al menos una cuota, avanzar fecha
+            saldo_pendiente += valor_cuota  # Se "renueva" la deuda de la nueva fecha esperada
+            fecha_esperada += timedelta(days=1)
+            
+            
+        # Si el valor es menor a la cuota, marcarlo en rojo
+        tag = "deuda" if valor_registro < valor_cuota else ""
+        # Insertar en el Treeview
+        fecha_formateada = fecha_pago.strftime("%d-%m-%Y")
+        fecha_esperada_formateada = fecha_esperada.strftime("%d-%m-%Y")
+        tree.insert("", "end", values=(fecha_esperada_formateada, fecha_formateada, *registro[1:]), tags=(tag,))
 
     tree.pack(fill="both", expand=True)
+
+
+def join_and_export():
+    # Abrir el diálogo para seleccionar la carpeta de destino
+    root = tk.Tk()
+    root.withdraw()  # Ocultar la ventana principal de Tkinter
+    folder_selected = filedialog.askdirectory(title="Selecciona una carpeta para guardar el archivo")
+
+    if not folder_selected:  # Si el usuario cancela, salir de la función
+        messagebox.showwarning("Operación cancelada", "No se guardó ningún archivo.")
+        return
+
+    output_path = os.path.join(folder_selected, "resultado.xlsx")
+
+    # Conectar a la base de datos
+    conn = sqlite3.connect('diccionarios/base_dat.db')
+
+    # Definir la consulta SQL con el JOIN usando 'placa' como clave
+    query = """
+    SELECT r.*, p.*
+    FROM registros r
+    LEFT JOIN propietario p ON r.placa = p.placa
+    """
+
+    # Ejecutar la consulta y cargar los datos en un DataFrame
+    merged_df = pd.read_sql_query(query, conn)
+
+    # Cerrar la conexión
+    conn.close()
+
+    # Exportar a Excel en la carpeta seleccionada
+    merged_df.to_excel(output_path, index=False)
+
+    # Mostrar mensaje con la ruta del archivo guardado
+    messagebox.showinfo("Exportación exitosa", f"El archivo .xlsx se guardó en:\n{output_path}")
+
+
+
+
 
 

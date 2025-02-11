@@ -6,6 +6,7 @@ import json
 from datetime import datetime
 import pandas as pd
 import tkinter.font as tkFont
+from PIL import Image, ImageTk
 from logica import *  # Importar todas las funciones de logica.py
 
 # Función para cargar las opciones de cuentas disponibles en la DB
@@ -24,15 +25,20 @@ else:
     print("No se encontró el icono en la ruta especificada")
 
 # Frame para el formulario y los botones
-frame_superior = tk.Frame(ventana)
-frame_superior.pack(fill="x", padx=10, pady=10)
-
+frame_superior = tk.Frame(ventana, bd=2, relief="groove", bg="#f0f0f0")
+frame_superior.grid(row=0, column=0, sticky="ew", padx=10, pady=10)  # Cambio pack → grid
+frame_superior.grid_columnconfigure(0, weight=1)  # Frame izquierdo (formulario y botones)
+frame_superior.grid_columnconfigure(1, weight=1)  # Frame derecho (info)
+# Frame izquierdo que contendrá formulario y botones
+frame_izquierdo = tk.Frame(frame_superior)
+frame_izquierdo.grid(row=0, column=0, sticky="nsew", padx=5)  # Agregar espacio
+frame_izquierdo.grid_rowconfigure(0, weight=1)
+frame_izquierdo.grid_rowconfigure(1, weight=1)
 # Definir el ancho común para todos los widgets
-ancho_widget = 20  # Puedes ajustar este valor según tus necesidades
-
+ancho_widget = 20 # ajustar este valor según necesidades
 # Crear Frame para el formulario
-frame_formulario = tk.Frame(frame_superior)
-frame_formulario.grid(row=0, column=0, padx=5, pady=5, sticky="w")
+frame_formulario = tk.Frame(frame_izquierdo, bd=2, relief="solid")
+frame_formulario.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
 
 # Campos del formulario organizados en filas
 tk.Label(frame_formulario, text="Cédula:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
@@ -122,7 +128,7 @@ entry_referencia.grid(row=4, column=1, padx=5, pady=5, sticky="w")
 frame_sugerencias = tk.Frame(frame_formulario, width=150, height=100)  # Ajusta según necesidad
 frame_sugerencias.grid(row=0, column=2, rowspan=5, padx=5, pady=5, sticky="nsw")
 # Crea el Listbox dentro del frame_sugerencias
-listbox_sugerencias = tk.Listbox(frame_sugerencias, height=5, width=20)  # Ajusta el width
+listbox_sugerencias = tk.Listbox(frame_sugerencias, height=5, width=20, justify="center")  # Ajusta el width
 listbox_sugerencias.grid(row=0, column=0, sticky="nsew")  # Usar grid() aquí en lugar de pack()
 # Hacer que el frame_sugerencias pueda expandirse
 frame_sugerencias.grid_rowconfigure(0, weight=1)  # Hace que el Listbox se expanda
@@ -178,44 +184,75 @@ combo_verificada = ttk.Combobox(frame_formulario, values=verificada_opciones, st
 combo_verificada.grid(row=4, column=4, padx=5, pady=5, sticky="w")
 
 # Frame para los botones
-frame_botones = tk.Frame(frame_superior)
-frame_botones.grid(row=1, column=0, pady=10, sticky="w")
-# Botones con el mismo ancho
-btn_agregar = tk.Button(frame_botones, text="Registrar", width=ancho_widget, command=lambda: agregar_registro(tree,entry_hoy, entry_cedula, entry_nombre, entry_placa, entry_monto, entry_referencia, entry_fecha, combo_tipo, combo_nequi, combo_verificada))
+# Función para cargar imágenes con tamaño uniforme
+imagenes = {}
+def cargar_imagen(nombre):
+    img = Image.open(f"img/{nombre}.png")
+    img = img.resize((20, 20), Image.Resampling.LANCZOS)
+    img_tk = ImageTk.PhotoImage(img)
+    imagenes[nombre] = img_tk
+    return img_tk
+
+# Frame de los botones
+frame_botones = tk.Frame(frame_izquierdo, bd=2, relief="solid")
+frame_botones.grid(row=1, column=0, padx=5, pady=5, sticky="ew")  # Se expande en X
+frame_botones.grid_columnconfigure(0, weight=1)
+frame_botones.grid_columnconfigure(1, weight=1)
+frame_botones.grid_columnconfigure(2, weight=1)
+
+btn_agregar = tk.Button(frame_botones, text="  Registrar",image=cargar_imagen("Grabar"), compound="left", width=ancho_widget, command=lambda: agregar_registro(tree,entry_hoy, entry_cedula, entry_nombre, entry_placa, entry_monto, entry_referencia, entry_fecha, combo_tipo, combo_nequi, combo_verificada))
 btn_agregar.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
 
-btn_consultar = tk.Button(frame_botones, text="Consulta/Actualiza", width=ancho_widget, command=lambda: cargar_db(tree, entry_cedula, entry_nombre, entry_placa, entry_referencia, entry_fecha, combo_tipo, combo_nequi, combo_verificada))
+btn_consultar = tk.Button(frame_botones, text="  Consultar", image=cargar_imagen("Buscar"), compound="left", width=ancho_widget, command=lambda: cargar_db(tree, entry_cedula, entry_nombre, entry_placa, entry_referencia, entry_fecha, combo_tipo, combo_nequi, combo_verificada))
 btn_consultar.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
 
-btn_limpiar = tk.Button(frame_botones, text="Limpiar", bg="red", fg="white", width=ancho_widget, command=lambda: limpiar_formulario(entry_cedula, entry_nombre, entry_placa, entry_monto, entry_referencia, entry_fecha, combo_tipo, combo_nequi, combo_verificada, listbox_sugerencias, tree))
+btn_limpiar = tk.Button(frame_botones, text="    Limpiar", image=cargar_imagen("Borrar"), compound="left", width=ancho_widget, command=lambda: limpiar_formulario(entry_cedula, entry_nombre, entry_placa, entry_monto, entry_referencia, entry_fecha, combo_tipo, combo_nequi, combo_verificada, listbox_sugerencias, tree))
 btn_limpiar.grid(row=0, column=2, padx=5, pady=5, sticky="ew")
 
-btn_cuentas = tk.Button(frame_botones, text="Cuentas", bg="green", fg="white", width=ancho_widget, command=abrir_ventana_cuentas)
-btn_cuentas.grid(row=2, column=0, padx=5, pady=5, sticky="ew")
+btn_cuentas = tk.Button(frame_botones, text="    Cuentas", image=cargar_imagen("Cuenta"), compound="left", width=ancho_widget, command=abrir_ventana_cuentas)
+btn_cuentas.grid(row=1, column=0, padx=5, pady=5, sticky="ew")
 
-btn_clientes = tk.Button(frame_botones, text="Clientes", bg="blue", fg="white", width=ancho_widget, command=abrir_ventana_clientes)
-btn_clientes.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
+btn_clientes = tk.Button(frame_botones, text="   Clientes", image=cargar_imagen("Cliente"), compound="left", width=ancho_widget, command=abrir_ventana_clientes)
+btn_clientes.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
 
-btn_extracto = tk.Button(frame_botones, text="Extracto", bg="orange", fg="white", width=ancho_widget, command=lambda: mostrar_registros(entry_nombre, entry_fecha))
-btn_extracto.grid(row=2, column=2, padx=5, pady=5, sticky="ew")
+btn_extracto = tk.Button(frame_botones, text="   Extracto", image=cargar_imagen("Extracto"), compound="left", width=ancho_widget, command=lambda: mostrar_registros(entry_nombre, entry_fecha))
+btn_extracto.grid(row=1, column=2, padx=5, pady=5, sticky="ew")
+
+btn_export = tk.Button(frame_botones, text="   Exportar", image=cargar_imagen("Exportar"), compound="left" , command=join_and_export)
+btn_export.grid(row=2, column=0, padx=5, pady=5, sticky="ew")
+
 
 # Reservar espacio para la sección vacía
-frame_vacio = tk.Frame(frame_superior, height=20)
-frame_vacio.grid(row=2, column=0, pady=5)
+# Frame de información (derecha)
+frame_info = tk.Frame(frame_superior, height=20, bd=2, relief="solid")
+frame_info.grid(row=0, column=1, padx=5, pady=5, sticky="nsew")  # Agregar padx
 
-# Treeview con scrollbar
-tree_frame = tk.Frame(ventana)
-tree_frame.pack(fill="both", expand=True)
+# Frame para el Treeview
+tree_frame = tk.Frame(ventana, bd=2, relief="ridge")
+tree_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+# Scrollbar vertical
 scroll_y = ttk.Scrollbar(tree_frame, orient="vertical")
-scroll_y.pack(side="right", fill="y")
-tree = ttk.Treeview(tree_frame, columns=("id", "Fecha_sistema", "Fecha_registro", "Cedula", "Nombre", "Placa", "Valor", "Tipo", "Nombre_cuenta", "Referencia", "Verificada"), show="headings", yscrollcommand=scroll_y.set)
+# Treeview con sus columnas
+tree = ttk.Treeview(tree_frame, columns=("id", "Fecha_sistema", "Fecha_registro", "Cedula", "Nombre", 
+                                        "Placa", "Valor", "Tipo", "Nombre_cuenta", "Referencia", "Verificada"), 
+                    show="headings", yscrollcommand=scroll_y.set)
+# Configurar la scrollbar para que funcione con el Treeview
 scroll_y.config(command=tree.yview)
-
+# Etiqueta para filas destacadas en rojo y en negrita
 tree.tag_configure("rojo_bold", foreground="red", font=("Helvetica", 10, "bold"))
+# Configurar encabezados y alineación de columnas
 for col in tree["columns"]:
     tree.heading(col, text=col)
     tree.column(col, anchor="center")
-tree.pack(fill="both", expand=True)
+# Ubicar elementos en la grilla
+tree.grid(row=0, column=0, sticky="nsew")
+scroll_y.grid(row=0, column=1, sticky="ns")
+# Configurar expansión para que se adapte correctamente
+ventana.grid_rowconfigure(1, weight=1)
+ventana.grid_columnconfigure(0, weight=1)
+tree_frame.grid_rowconfigure(0, weight=1)
+tree_frame.grid_columnconfigure(0, weight=1)
+
 
 def on_double_click(event, tree):
     # Obtener el item seleccionado
