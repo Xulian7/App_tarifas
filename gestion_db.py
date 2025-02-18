@@ -3,132 +3,98 @@ import json
 import sqlite3
 import pandas as pd
 import tkinter as tk
+from tkinter import ttk
 from tkinter import messagebox
+from PIL import Image, ImageTk
 
+imagenes = {} 
 db_path = "diccionarios/base_dat.db"
 users_path = "diccionarios/usuarios.json"
 excel_path = "diccionarios/baseExcel.xlsx"
 
-# Ventana de autenticación
-def pedir_contraseña():
-    auth_window = tk.Tk()  # Crear la ventana principal para la autenticación
-    auth_window.title("Autenticación")
-    auth_window.geometry("400x200")
-    auth_window.resizable(False, False)
-
-    tk.Label(auth_window, text="Ingrese la contraseña de Dev:", font=("Arial", 12)).pack(pady=10)
-
-    entrada = tk.Entry(auth_window, show="*", font=("Arial", 14), width=25)
-    entrada.pack(pady=5)
-
-    resultado = tk.StringVar()
-
-    def confirmar():
-        resultado.set(entrada.get())
-        auth_window.destroy()
-
-    tk.Button(auth_window, text="Aceptar", font=("Arial", 12), command=confirmar).pack(pady=10)
-
-    auth_window.mainloop()  # Mantener la ventana abierta hasta que se cierre
-    
-    return resultado.get()
-
-# Función para validar la contraseña
-def validar_credenciales():
-    if not os.path.exists(users_path):
-        messagebox.showerror("Error", "El archivo de usuarios no existe.")
-        return False
-
-    with open(users_path, "r") as file:
-        usuarios = json.load(file)
-
-    password_correcta = usuarios.get("Dev")
-
-    if not password_correcta:
-        messagebox.showerror("Error", "Usuario 'Dev' no encontrado en el archivo.")
-        return False
-
-    intentos = 3
-    while intentos > 0:
-        password_ingresada = pedir_contraseña()
-        if password_ingresada == password_correcta:
-            return True
-        else:
-            messagebox.showerror("Error", f"Contraseña incorrecta. Intentos restantes: {intentos - 1}")
-            intentos -= 1
-
-    return False
-
 def create_database():
     try:
+        # Verificar si la base de datos ya existe antes de crear la conexión
         db_exists = os.path.exists(db_path)
+
+        # Conectar a la base de datos
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
+        # Habilitar claves foráneas
+        cursor.execute("PRAGMA foreign_keys = ON;")
+
+        # Si la base de datos no existía, mostrar mensaje
         if not db_exists:
             messagebox.showinfo("Éxito", "Base de datos creada correctamente.")
 
-        cursor.execute("PRAGMA foreign_keys = ON;")
-
+        # Diccionario con las tablas a crear
         tables = {
+            "propietario": """
+                CREATE TABLE IF NOT EXISTS propietario (
+                    Placa TEXT PRIMARY KEY,
+                    Modelo TEXT,
+                    Color TEXT,
+                    Tarjeta_propiedad TEXT
+                )
+            """,
             "clientes": """
                 CREATE TABLE IF NOT EXISTS clientes (
                     Cedula TEXT PRIMARY KEY,
-                    Nombre TEXT,
+                    Nombre TEXT NOT NULL,
+                    Nacionalidad TEXT,
                     Telefono TEXT,
                     Direccion TEXT,
-                    Placa TEXT UNIQUE,
-                    Tarjeta_propiedad TEXT,
-                    Fecha_inicio TEXT,
-                    Fecha_final TEXT,
-                    Tipo_contrato TEXT,
-                    Valor_cuota Real
+                    Placa TEXT,
+                    Fecha_inicio TEXT NOT NULL,
+                    Fecha_final TEXT NOT NULL,
+                    Tipo_contrato TEXT NOT NULL,
+                    Valor_cuota REAL CHECK(Valor_cuota >= 0),
+                    Estado TEXT,
+                    FOREIGN KEY (Placa) REFERENCES propietario(Placa) ON DELETE SET NULL
                 )
             """,
             "registros": """
                 CREATE TABLE IF NOT EXISTS registros (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    Fecha_sistema TEXT,
-                    Fecha_registro TEXT,
-                    Cedula TEXT,
-                    Nombre TEXT,
+                    Fecha_sistema TEXT NOT NULL,
+                    Fecha_registro TEXT NOT NULL,
+                    Cedula TEXT NOT NULL,
+                    Nombre TEXT NOT NULL,
                     Placa TEXT,
-                    Valor REAL,
-                    Tipo TEXT,
+                    Valor REAL CHECK(Valor >= 0),
+                    Saldos REAL CHECK(Valor >= 0),
+                    Tipo TEXT NOT NULL,
                     Nombre_cuenta TEXT,
                     Referencia TEXT,
                     Verificada TEXT,
-                    FOREIGN KEY (Cedula) REFERENCES clientes(Cedula),
-                    FOREIGN KEY (Placa) REFERENCES clientes(Placa)
+                    FOREIGN KEY (Cedula) REFERENCES clientes(Cedula) ON DELETE CASCADE,
+                    FOREIGN KEY (Placa) REFERENCES propietario(Placa) ON DELETE SET NULL
                 )
             """,
             "cuentas": """
                 CREATE TABLE IF NOT EXISTS cuentas (
                     ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                    Titular TEXT,
-                    Entidad TEXT
-                )
-            """,
-            "propietario": """
-                CREATE TABLE IF NOT EXISTS propietario (
-                    IDP INTEGER PRIMARY KEY AUTOINCREMENT,
-                    Placa TEXT,
-                    Tarjeta_propiedad TEXT
+                    Nombre_cuenta TEXT,
+                    Llave Text
                 )
             """
         }
 
-        for table_name, query in tables.items():
+        # Ejecutar la creación de las tablas
+        for query in tables.values():
             cursor.execute(query)
 
+        # Confirmar cambios
         conn.commit()
         conn.close()
+
+        # Mensaje de éxito
         messagebox.showinfo("Éxito", "Tablas creadas correctamente.")
 
-    except Exception as e:
-        messagebox.showerror("Error", f"Ocurrió un error: {e}")
-        
-        
+    except sqlite3.Error as e:
+        messagebox.showerror("Error", f"Error al crear la base de datos: {e}")
+
 def migrar_clientes():
     try:
         if not os.path.exists(excel_path):
@@ -140,8 +106,7 @@ def migrar_clientes():
 
         # Definir las columnas esperadas en la base de datos
         columnas_db = [
-            "Cedula", "Nombre", "Telefono", "Direccion", "Placa", "Tarjeta_propiedad",
-            "Fecha_inicio", "Fecha_final", "Tipo_contrato", "Valor_cuota"
+            "Cedula", "Nombre", "Nacionalidad", "Telefono", "Direccion", "Placa", "Fecha_inicio", "Fecha_final", "Tipo_contrato", "Valor_cuota", "Estado"
         ]
 
         # Validar que las columnas en Excel coincidan con las esperadas
@@ -157,8 +122,8 @@ def migrar_clientes():
         for _, row in df.iterrows():
             try:
                 cursor.execute("""
-                    INSERT INTO clientes (Cedula, Nombre, Telefono, Direccion, Placa, Tarjeta_propiedad, Fecha_inicio, Fecha_final, Tipo_contrato, Valor_cuota)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO clientes (Cedula, Nombre, Nacionalidad, Telefono, Direccion, Placa, Fecha_inicio, Fecha_final, Tipo_contrato, Valor_cuota, Estado)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, tuple(row[column] for column in columnas_db))
             except sqlite3.IntegrityError as e:
                 messagebox.showwarning("Advertencia", f"No se pudo insertar el cliente {row['Cedula']} (Duplicado o error en datos): {e}")
@@ -169,8 +134,6 @@ def migrar_clientes():
 
     except Exception as e:
         messagebox.showerror("Error", f"Ocurrió un error al migrar clientes: {e}")
-
-
 
 def migrar_registros():
     try:
@@ -185,7 +148,7 @@ def migrar_registros():
         # Definir las columnas requeridas
         columnas_requeridas = [
             "Fecha_sistema", "Fecha_registro", "Cedula", "Nombre", "Placa", 
-            "Valor", "Tipo", "Nombre_cuenta", "Referencia", "Verificada"
+            "Valor", "Saldos", "Tipo", "Nombre_cuenta", "Referencia", "Verificada"
         ]
         
         # Validar que las columnas del Excel coincidan
@@ -212,8 +175,8 @@ def migrar_registros():
         query = """
         INSERT INTO registros (
             Fecha_sistema, Fecha_registro, Cedula, Nombre, Placa, 
-            Valor, Tipo, Nombre_cuenta, Referencia, Verificada
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            Valor, Saldos, Tipo, Nombre_cuenta, Referencia, Verificada
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
         cursor.executemany(query, df.values.tolist())
@@ -238,7 +201,7 @@ def migrar_cuentas():
         df = pd.read_excel(excel_path, sheet_name="cuentas", dtype=str)
         
         # Definir las columnas requeridas
-        columnas_requeridas = ["Titular", "Entidad"]
+        columnas_requeridas = ["Nombre cuenta", "Llave"]
         
         # Validar que las columnas del Excel coincidan
         if list(df.columns) != columnas_requeridas:
@@ -256,7 +219,7 @@ def migrar_cuentas():
 
         # Insertar los datos en la tabla 'cuentas'
         query = """
-        INSERT INTO cuentas (Titular, Entidad) VALUES (?, ?)
+        INSERT INTO cuentas (Nombre_cuenta, Llave) VALUES (?, ?)
         """
         cursor.executemany(query, df.values.tolist())
         
@@ -269,7 +232,6 @@ def migrar_cuentas():
     except Exception as e:
         messagebox.showerror("Error", f"Ocurrió un problema durante la migración: {e}")
         
-
 def migrar_propietarios():
     try:
         # Verificar si el archivo existe
@@ -281,7 +243,7 @@ def migrar_propietarios():
         df = pd.read_excel(excel_path, sheet_name="propietario", dtype=str)
         
         # Definir las columnas requeridas
-        columnas_requeridas = ["Placa", "Tarjeta_propiedad"]
+        columnas_requeridas = ["Placa", "Modelo","Color", "Tarjeta_propiedad"]
         
         # Validar que las columnas del Excel coincidan
         if list(df.columns) != columnas_requeridas:
@@ -299,7 +261,7 @@ def migrar_propietarios():
 
         # Insertar los datos en la tabla 'cuentas'
         query = """
-        INSERT INTO propietario (Placa, Tarjeta_propiedad) VALUES (?, ?)
+        INSERT INTO propietario (Placa, Modelo, Color, Tarjeta_propiedad) VALUES (?, ?, ?, ?)
         """
         cursor.executemany(query, df.values.tolist())
         
@@ -311,30 +273,81 @@ def migrar_propietarios():
 
     except Exception as e:
         messagebox.showerror("Error", f"Ocurrió un problema durante la migración: {e}")    
-        
-        
-# Validar credenciales antes de abrir la interfaz
-#if validar_credenciales():
+
+def cargar_imagen(nombre):
+        imagen = Image.open(f"img/{nombre}.png")
+        imagen = imagen.resize((48, 48), Image.Resampling.LANCZOS)
+        imagen_tk = ImageTk.PhotoImage(imagen)
+        imagenes[nombre] = imagen_tk
+        return imagen_tk
+    
+def on_enter(event):
+    """Cambia el color del botón al pasar el mouse."""
+    event.widget.config(bg="#004080")
+
+def on_leave(event):
+    """Restaura el color original al salir el mouse."""
+    event.widget.config(bg="#0056b3")
+
+# Inicializar ventana
 root = tk.Tk()
 root.title("Gestión de Base de Datos")
-root.geometry("600x400")
-root.configure(bg="#f0f0f0")  # Fondo gris claro
+root.geometry("750x550")
+root.configure(bg="#f0f0f0")
 
-# Configuración del grid
+# Configurar el grid de la ventana principal
 root.columnconfigure(0, weight=1)
+root.rowconfigure(0, weight=1)
+
+# Frame contenedor para centrar botones
+frame_botones = tk.Frame(root, bg="#f0f0f0", bd=2, relief="solid")
+frame_botones.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
+frame_botones.pack_propagate(False)  # Evita que el frame cambie de tamaño por su contenido
+
 
 # Estilo de los botones
-btn_style = {"font": ("Arial", 12), "width": 25, "height": 2, "bg": "#007BFF", "fg": "white"}
+btn_style = {
+    "font": ("Arial", 14, "bold"),
+    #"width": 28,  # Ajuste de ancho del botón
+    #"height": 10,  # Ajuste de altura del botón
+    "bg": "#0056b3",
+    "fg": "white",
+    "bd": 2,
+    "compound": "left",  # Imagen a la izquierda del texto
+    "anchor": "w",  # Alinear el texto a la izquierda
+    "padx": 10,  # Espacio entre imagen y texto
+    "pady": 10  # Espaciado interno
+}
 
-# Botones de creación de tablas
-tk.Button(root, text="Crear Base de Datos", command=create_database, **btn_style).grid(row=0, column=0, padx=10, pady=5)
+# Crear botones uno por uno
 
-# Botones de migración de datos
-tk.Button(root, text="Migrar Clientes", command=migrar_clientes, **btn_style).grid(row=1, column=0, padx=10, pady=5)
-tk.Button(root, text="Migrar Registros", command=migrar_registros, **btn_style).grid(row=2, column=0, padx=10, pady=5)
-tk.Button(root, text="Migrar Cuentas", command=migrar_cuentas, **btn_style).grid(row=3, column=0, padx=10, pady=5)
-tk.Button(root, text="Migrar asociados", command=migrar_propietarios, **btn_style).grid(row=4, column=0, padx=10, pady=5)
+btn_db = tk.Button(frame_botones, text="  Crear Base de Datos", image=cargar_imagen("database"), command=create_database, **btn_style)
+btn_db.grid(row=0, column=0, padx=30, pady=10, sticky="ew")
+btn_db.bind("<Enter>", on_enter)
+btn_db.bind("<Leave>", on_leave)
+
+btn_clientes = tk.Button(frame_botones, text="  Migrar Clientes", image=cargar_imagen("clients"), command=migrar_clientes, **btn_style)
+btn_clientes.grid(row=1, column=0, padx=30, pady=10, sticky="ew")
+btn_clientes.bind("<Enter>", on_enter)
+btn_clientes.bind("<Leave>", on_leave)
+
+btn_registros = tk.Button(frame_botones, text="  Migrar Registros", image=cargar_imagen("records"), command=migrar_registros, **btn_style)
+btn_registros.grid(row=2, column=0, padx=30, pady=10, sticky="ew")
+btn_registros.bind("<Enter>", on_enter)
+btn_registros.bind("<Leave>", on_leave)
+
+
+btn_cuentas = tk.Button(frame_botones, text="  Migrar Cuentas", image=cargar_imagen("accounts"), command=migrar_cuentas, **btn_style)
+btn_cuentas.grid(row=3, column=0, padx=30, pady=10, sticky="ew")
+btn_cuentas.bind("<Enter>", on_enter)
+btn_cuentas.bind("<Leave>", on_leave)
+
+btn_asociados = tk.Button(frame_botones, text="  Migrar Asociados", image=cargar_imagen("associates"), command=migrar_propietarios, **btn_style)
+btn_asociados.grid(row=4, column=0, padx=30, pady=10, sticky="ew")
+btn_asociados.bind("<Enter>", on_enter)
+btn_asociados.bind("<Leave>", on_leave)
+
 
 root.mainloop()
-#else:
-#    messagebox.showerror("Error", "Acceso denegado. No se pudo autenticar al usuario.")
+
+
