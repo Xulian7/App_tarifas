@@ -25,7 +25,12 @@ def cargar_db(tree, entry_cedula, entry_nombre, entry_placa, entry_referencia, e
         tipo = combo_tipo.get()
         nequi = combo_nequi.get()
         verificada = combo_verificada.get()
+        
+        # Si la fecha no está vacía, convertirla a 'YYYY-MM-DD'
+        if fecha:
+            fecha = datetime.strptime(fecha, "%d-%m-%Y").strftime("%Y-%m-%d")  # Convertir a formato 'YYYY-MM-DD'
 
+        
         # Conectar a la base de datos SQLite
         conn = sqlite3.connect('diccionarios/base_dat.db')
         cursor = conn.cursor()
@@ -81,8 +86,9 @@ def cargar_db(tree, entry_cedula, entry_nombre, entry_placa, entry_referencia, e
         # Configurar la etiqueta para sombrear
         tree.tag_configure("sombreado", background="lightpink")
         
-        # Ordenar los datos por 'Cedula'
-        rows.sort(key=lambda x: str(x[3]))  # Ordena por el valor de la columna Cedula (índice 3, ya que id ahora está en 0)
+        # Ordenar primero por 'Cedula' (columna 3) y luego por 'id' (columna 0)
+        rows.sort(key=lambda x: (str(x[3]), str(x[0])))
+
 
         # Insertar las filas en el Treeview
         for row in rows:
@@ -948,7 +954,7 @@ def mostrar_registros(entry_nombre, entry_fecha):
             cursor.execute("SELECT Cedula, Nombre, Placa FROM Registros WHERE Nombre = ? LIMIT 1", (nombre,))
             info_cliente = cursor.fetchone()
             # Obtener valores de pagos, cuotas y plazos
-            cursor.execute("SELECT Fecha_inicio, Fecha_final, Valor_cuota FROM clientes WHERE Nombre = ?", (nombre,))
+            cursor.execute("SELECT Fecha_inicio, Valor_cuota FROM clientes WHERE Nombre = ?", (nombre,))
             balance = cursor.fetchone()
             # Buscar la suma de abonos en la tabla 'registros'
             cursor.execute("SELECT COALESCE(SUM(Valor), 0) FROM registros WHERE Nombre = ?", (nombre,))
@@ -963,11 +969,10 @@ def mostrar_registros(entry_nombre, entry_fecha):
                 return
 
             cedula, nombre, placa = info_cliente
-            fecha_inicio_str, Fecha_final_str, valor_cuota = balance
+            fecha_inicio_str, valor_cuota = balance
                     
             # Calcular C_vencidas (días transcurridos desde Fecha_inicio hasta hoy)
             fecha_inicio = datetime.strptime(fecha_inicio_str, "%Y-%m-%d")
-            C_totales = (fecha_inicio - datetime.strptime(Fecha_final_str, "%Y-%m-%d")).days
             c_vencidas = (datetime.today() - fecha_inicio).days + 1
             c_saldas = total_abonos / valor_cuota if valor_cuota else 0
 
@@ -1317,7 +1322,6 @@ def join_and_export():
     messagebox.showinfo("Exportación exitosa", f"El archivo .xlsx se guardó en:\n{output_path}")
 
 def arqueo():
-
     # Función para obtener los datos y llenar el treeview
     def generar_reporte():
         fecha_seleccionada = entry_fecha.get()
@@ -1363,14 +1367,25 @@ def arqueo():
         
         total_efectivo = cursor.fetchone()[0]
         total_efectivo = total_efectivo if total_efectivo else 0
-
+        
+        # Obtener la sumatoria total de los registros donde Tipo = 'Ajuste P/P' para la fecha seleccionada
+        cursor.execute("""
+            SELECT SUM(Valor) FROM registros
+            WHERE Fecha_sistema = ? AND Tipo = 'Ajuste P/P'
+        """, (fecha_seleccionada,))
+        
+        total_ajuste = cursor.fetchone()[0]
+        total_ajuste = total_ajuste if total_ajuste else 0
+        
         # Insertar dos filas en blanco
         tree.insert("", "end", values=("", "", ""))
-        tree.insert("", "end", values=("", "", ""))
-
+    
         # Insertar la fila Total Efectivo con estilo resaltado
         tree.insert("", "end", values=(fecha_seleccionada, "TOTAL EFECTIVO", total_efectivo), tags=("total",))
-
+        
+        # Insertar la fila Total Efectivo con estilo resaltado
+        tree.insert("", "end", values=(fecha_seleccionada, "TOTAL AJUSTE P/P", total_ajuste), tags=("total",))
+        
         # Insertar la fila TOTAL DÍA con estilo resaltado
         tree.insert("", "end", values=(fecha_seleccionada, "TOTAL DÍA", total_dia), tags=("total",))
 
@@ -1385,10 +1400,14 @@ def arqueo():
     frame_superior = tk.Frame(root)
     frame_superior.pack(pady=10)
 
+    # Obtener la fecha actual en formato AAAA-MM-DD
+    fecha_hoy = datetime.today().strftime('%Y-%m-%d')
+
     # Entry para ingresar la fecha
     tk.Label(frame_superior, text="Fecha:").pack(side=tk.LEFT, padx=5)
     entry_fecha = tk.Entry(frame_superior, width=15)
     entry_fecha.pack(side=tk.LEFT, padx=5)
+    entry_fecha.insert(0, fecha_hoy)  # Insertar la fecha actual por defecto
 
     # Botón para generar el reporte
     btn_reporte = tk.Button(frame_superior, text="Reporte de valores", command=generar_reporte)
@@ -1434,7 +1453,6 @@ def ui_atrasos():
         conn.close()
         return registros, clientes
 
-    # Cálculo de atraso por placa
     def calcular_atraso(registros, clientes):
         # Obtenemos la fecha actual
         fecha_actual = datetime.now()
@@ -1451,7 +1469,7 @@ def ui_atrasos():
             valor_cuota = cliente['Valor_cuota']
 
             # Calculamos los días transcurridos
-            dias_transcurridos = (fecha_actual - fecha_inicio).days
+            dias_transcurridos = (fecha_actual - fecha_inicio).days + 1
 
             # Total de lo que debería haberse pagado hasta la fecha
             monto_adeudado = dias_transcurridos * valor_cuota
@@ -1459,27 +1477,33 @@ def ui_atrasos():
             # Filtramos los registros de pagos para este cliente (por cédula)
             pagos_cliente = registros[registros['Cedula'] == cedula]
 
-            # Sumamos los pagos realizados
-            total_pagado = pagos_cliente['Valor'].sum()
+            # Verificamos si el DataFrame de pagos no está vacío
+            if not pagos_cliente.empty:
+                # Sumamos los pagos realizados
+                total_pagado = pagos_cliente['Valor'].sum()
 
-            # Calculamos los días cubiertos por los pagos
-            dias_cubiertos = total_pagado / valor_cuota
+                # Calculamos los días cubiertos por los pagos
+                dias_cubiertos = total_pagado / valor_cuota
 
-            # Calculamos los días de atraso (restando los días cubiertos)
-            dias_atraso = dias_transcurridos - dias_cubiertos
+                # Calculamos los días de atraso (restando los días cubiertos)
+                dias_atraso = dias_transcurridos - dias_cubiertos
 
-            # Calculamos el atraso
-            atraso = monto_adeudado - total_pagado
+                # Calculamos el atraso
+                atraso = monto_adeudado - total_pagado
 
-            # Si hay atraso, lo registramos
-            if atraso > 0 and dias_atraso > 0:  # Solo si hay atraso y días de atraso positivos
-                placa = pagos_cliente.iloc[0]['Placa']  # Usamos la placa del primer registro de pago
-                atraso_por_placa.append((placa, nombre, round(dias_transcurridos, 1), round(dias_atraso, 1), round(atraso, 2)))
+                # Si hay atraso, lo registramos
+                if atraso > 0 and dias_atraso > 0:  # Solo si hay atraso y días de atraso positivos
+                    # Usamos la placa del primer registro de pago
+                    placa = pagos_cliente.iloc[0]['Placa'] if 'Placa' in pagos_cliente.columns else 'Sin Placa'
+                    atraso_por_placa.append((placa, nombre,  round(dias_atraso, 1), round(atraso, 2)))
+            else:
+                print(f"No hay pagos registrados para el cliente con cédula {cedula}")
 
         # Ordenamos los datos por "Días de Atraso" de mayor a menor
         atraso_por_placa.sort(key=lambda x: x[3], reverse=True)
 
         return atraso_por_placa
+
 
     # Crear la interfaz gráfica para mostrar los datos
 
@@ -1495,25 +1519,33 @@ def ui_atrasos():
     root.grid_columnconfigure(0, weight=1)  # La columna 0 (donde está el Treeview) se redimensionará
 
     # Crear un Treeview para mostrar los datos
-    tree = ttk.Treeview(root, columns=("Placa", "Nombre", "Días Transcurridos", "Días de Atraso", "Valor Atraso"), show="headings")
+    tree = ttk.Treeview(root, columns=("Placa", "Nombre",  "Días de Atraso", "Valor Atraso"), show="headings")
     tree.heading("Placa", text="Placa")
     tree.heading("Nombre", text="Nombre")
-    tree.heading("Días Transcurridos", text="Días Transcurridos")
     tree.heading("Días de Atraso", text="Días de Atraso")
     tree.heading("Valor Atraso", text="Valor Atraso")
 
     # Centrar el texto en todas las columnas
     tree.column("Placa", anchor="center")
     tree.column("Nombre", anchor="center")
-    tree.column("Días Transcurridos", anchor="center")
     tree.column("Días de Atraso", anchor="center")
     tree.column("Valor Atraso", anchor="center")
 
     for atraso in atraso_por_placa:
         # Formateamos el monto con COP y los días con un solo decimal
-        monto_formateado = f"{atraso[4]:,.2f} COP"
-        tree.insert("", "end", values=(atraso[0], atraso[1], atraso[2], atraso[3], monto_formateado))
-
+        monto_formateado = f"{atraso[3]:,.2f} COP"
+        tree.insert("", "end", values=(atraso[0], atraso[1], atraso[2],  monto_formateado))
+        
+    # Insertar una fila en blanco
+    tree.insert("", "end", values=("", "", "", ""))
+    # Calcular el total de la columna "Valor Atraso"
+    total_atraso = sum(atraso[3] for atraso in atraso_por_placa)
+    # Formatear el total en COP
+    total_formateado = f"{total_atraso:,.2f} COP"
+    # Insertar la fila "TOTAL" en negrita
+    tree.insert("", "end", values=("TOTAL", "", "", total_formateado), tags=("total",))
+    # Aplicar formato en negrita a la fila "TOTAL"
+    tree.tag_configure("total", font=("Arial", 10, "bold"))
     # Colocar el Treeview en la ventana usando grid
     tree.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
